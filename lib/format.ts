@@ -16,6 +16,12 @@ function monthDay(ms: number): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
+/** Short absolute day, e.g. "Aug 20". Used where a relative label would be
+ * vaguer than the real date, like a subscription renewal. */
+export function formatMonthDay(ms: number): string {
+  return monthDay(ms);
+}
+
 /** Inclusive day span, e.g. "Feb 2 – Feb 15", collapsing to "Feb 2" when the
  * range is a single day. Used for the longest-streak caption. */
 export function formatDayRange(startMs: number, endMs: number): string {
