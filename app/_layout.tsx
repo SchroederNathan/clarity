@@ -4,13 +4,14 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ProgressiveBlur } from '@/components/glass-tabs';
 import { IntroRevealProvider, SplashOverlay } from '@/components/splash';
 import { fontAssets, fonts } from '@/constants/theme';
 import { AppReadyProvider } from '@/hooks/use-mark-interactive';
+import { useSplashState } from '@/hooks/use-splash-state';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -72,8 +73,7 @@ function RootLayout() {
   const { scheme } = useTheme();
   // revealed flips when the splash logo ends (content starts staggering in
   // beneath the fade); splashDone flips when the fade completes (overlay unmounts).
-  const [revealed, setRevealed] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
+  const { revealed, setRevealed, splashDone, setSplashDone } = useSplashState();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
