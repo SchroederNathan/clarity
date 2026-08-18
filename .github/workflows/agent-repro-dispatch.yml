@@ -29,9 +29,12 @@ jobs:
         with:
           node-version: 20
       # eas workflow:run evaluates app.config.ts, which needs the project's
-      # node_modules to transpile TypeScript.
+      # node_modules to transpile TypeScript. HUGEICONS_TOKEN feeds .npmrc
+      # for the private @hugeicons-pro registry.
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+        env:
+          HUGEICONS_TOKEN: ${{ secrets.HUGEICONS_TOKEN }}
       - name: Acknowledge on the issue
         env:
           GH_TOKEN: ${{ github.token }}
