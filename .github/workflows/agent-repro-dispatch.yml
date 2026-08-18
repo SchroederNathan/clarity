@@ -28,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # eas workflow:run evaluates app.config.ts, which needs the project's
+      # node_modules to transpile TypeScript.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
       - name: Acknowledge on the issue
         env:
           GH_TOKEN: ${{ github.token }}
