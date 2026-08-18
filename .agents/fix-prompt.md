@@ -39,7 +39,16 @@ One session is: start → install → drive → stop.
   `IN_PROGRESS`, and record the session id from it for the session URL.
 - Install the app. Get the newest finished simulator build's artifact URL:
   `npx --yes eas-cli@latest build:list --platform ios --build-profile simulator --status finished --limit 1 --json --non-interactive`
-  then `npx --yes eas-cli@latest simulator:exec npx agent-device@latest install-from-source "<applicationArchiveUrl>" --platform ios`.
+  The `applicationArchiveUrl` answers with a 307 redirect, which the
+  simulator VM's downloader does not follow. So install in this order:
+  1. Resolve the redirect on this worker first:
+     `FINAL_URL=$(curl -sIL -o /dev/null -w '%{url_effective}' "<applicationArchiveUrl>")`
+     then `npx --yes eas-cli@latest simulator:exec npx agent-device@latest install-from-source "$FINAL_URL" --platform ios`.
+  2. If that fails once, download and upload instead:
+     `curl -sL -o app-archive "<applicationArchiveUrl>"`, extract it
+     (`tar -xzf` or `unzip` depending on file type), find the `*.app`
+     directory, and
+     `npx --yes eas-cli@latest simulator:exec npx agent-device@latest install com.schroedernathan.clarityapp.preview "<path-to-.app>" --platform ios`.
 - Drive with `npx --yes eas-cli@latest simulator:exec npx agent-device@latest <verb>`:
   - `open com.schroedernathan.clarityapp.preview --platform ios`
   - `snapshot -i` — accessibility tree with `@e1`-style refs. Run this
