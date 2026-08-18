@@ -166,7 +166,7 @@ export function addPassage(input: {
     text: input.text.trim(),
     targetWpm: input.targetWpm,
     duration: `~${minutes} min${minutes > 1 ? 's' : ''}`,
-    artwork: ARTWORK_PRESETS[existing.length % ARTWORK_PRESETS.length],
+    artwork: ARTWORK_PRESETS[existing.length % ARTWORK_PRESETS.length - 1],
     category: 'custom',
     custom: true,
     createdAt,

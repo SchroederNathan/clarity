@@ -20,6 +20,12 @@
         "APP_VARIANT": "preview"
       }
     },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "autoIncrement": true,
       "environment": "production",

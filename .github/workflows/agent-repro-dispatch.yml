@@ -1,0 +1,38 @@
+# Bridge: GitHub issue label -> EAS workflow dispatch.
+#
+# EAS Workflows has no "issue labeled" trigger today, so this thin GitHub
+# Action forwards the event. All real work (simulator, agent, evidence)
+# happens on EAS in .eas/workflows/agent-repro.yml.
+#
+# Required repository secret:
+#   EXPO_TOKEN - robot access token for the Expo account
+#                (https://expo.dev/settings/access-tokens)
+name: Dispatch agent repro
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  dispatch:
+    if: github.event.label.name == 'repro'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Acknowledge on the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "🤖 Repro agent dispatched. It will boot a simulator, attempt to reproduce this, and report back here."
+      - name: Run agent-repro on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli@latest workflow:run .eas/workflows/agent-repro.yml \
+            -F issue_number="${{ github.event.issue.number }}" \
+            --non-interactive
