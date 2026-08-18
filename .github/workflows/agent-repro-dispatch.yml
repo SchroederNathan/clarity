@@ -13,6 +13,12 @@ on:
   issues:
     types: [labeled]
 
+# The default GITHUB_TOKEN is read-only in this repo; the ack comment needs
+# issue write access.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   dispatch:
     if: github.event.label.name == 'repro'
