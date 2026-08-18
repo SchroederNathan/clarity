@@ -1,0 +1,51 @@
+# Tag an issue, get a fix.
+#
+# Dispatched by .github/workflows/agent-repro-dispatch.yml when someone adds
+# the `repro` label to a GitHub issue. One headless Claude Code agent, in one
+# job on a default Linux worker, does the whole loop:
+#
+#   read the issue → reproduce it on an EAS Simulator (with screenshots)
+#   → comment the repro evidence on the issue → write the minimal fix
+#   → rebuild → verify the fix on a second EAS Simulator session
+#   → open a PR with before/after screenshots and both session video links
+#
+# A human reviews and merges; the agent never merges.
+#
+# Required EAS environment variables (production environment):
+#   CLAUDE_CODE_OAUTH_TOKEN - headless Claude Code auth (`claude setup-token`).
+#                             Do NOT also set ANTHROPIC_API_KEY; it takes
+#                             precedence and bills the API instead.
+#   GITHUB_TOKEN            - repo-scoped token: read the issue, comment,
+#                             push the fix branch, open the PR
+#   EXPO_TOKEN              - auths eas-cli for simulator sessions and the
+#                             verification build
+name: Agent fix (issue → repro → fix → verified PR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'GitHub issue number to reproduce and fix'
+        required: true
+
+jobs:
+  fix:
+    name: Reproduce on EAS Simulator, fix, verify, open PR
+    environment: production
+    env:
+      ISSUE_NUMBER: ${{ inputs.issue_number }}
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Run fix agent
+        run: |
+          case "$ISSUE_NUMBER" in *'${{'*|'') echo "issue_number input missing" >&2; exit 1;; esac
+          npm install -g @anthropic-ai/claude-code@latest
+          # --dangerously-skip-permissions: allowlist patterns reject commands
+          # that expand env vars (GITHUB_TOKEN), which blocks every gh/git/eas
+          # call in headless mode. Safe here: ephemeral single-purpose VM with
+          # repo-scoped secrets.
+          claude -p "$(cat .agents/fix-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 120 \
+            --output-format json
