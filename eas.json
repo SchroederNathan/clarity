@@ -24,6 +24,10 @@
       "extends": "preview",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_SEED_HOOKS": "1"
       }
     },
     "production": {

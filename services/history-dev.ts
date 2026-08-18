@@ -23,7 +23,7 @@ import { setNowOverride } from '@/services/clock';
 import { DRILLS } from '@/constants/drills';
 import { PASSAGES } from '@/constants/passages';
 import { TOPICS } from '@/constants/topics';
-import { RECORD_SCHEMA_VERSION, type SessionRecord } from '@/types/history';
+import { RECORD_SCHEMA_VERSION, type SessionRecord, type WordStat } from '@/types/history';
 
 /** Deterministic PRNG so the same seed produces the same ids and therefore the
  * same storage keys — re-seeding is then an idempotent no-op rather than a
@@ -142,6 +142,65 @@ export function generateHistory(options: SeedOptions = {}): SessionRecord[] {
   }
 
   return out.sort((a, b) => a.completedAt - b.completedAt);
+}
+
+/** Per-word aggregates to pair with `generateHistory`. Deterministic for a
+ * given seed, and shaped so the home screen has something to say: a few words
+ * qualify for "Words to master" (seen ≥ 3, streak broken, misses outstanding),
+ * a few count as mastered (once missed, now on a clean streak), and the rest
+ * are reliably clean. */
+export function generateWordStats(options: { seed?: number; now?: number } = {}): WordStat[] {
+  const rand = mulberry32(options.seed ?? 1);
+  const now = options.now ?? Date.now();
+  const day = (n: number) => now - n * DAY_MS;
+
+  const make = (
+    word: string,
+    kind: 'struggling' | 'mastered' | 'clean',
+  ): WordStat => {
+    const seen = 4 + Math.floor(rand() * 8);
+    if (kind === 'struggling') {
+      const clean = Math.floor(seen * (0.2 + rand() * 0.4));
+      const missed = seen - clean;
+      const mispronounced = Math.max(1, Math.round(missed * 0.7));
+      return {
+        word, seen, clean, mispronounced,
+        omitted: missed - mispronounced,
+        cleanStreak: Math.floor(rand() * 2),
+        everMissed: true,
+        firstSeenAt: day(30 + Math.floor(rand() * 10)),
+        lastSeenAt: day(Math.floor(rand() * 3)),
+      };
+    }
+    if (kind === 'mastered') {
+      return {
+        word, seen, clean: seen - 2, mispronounced: 2, omitted: 0,
+        cleanStreak: 3 + Math.floor(rand() * 4),
+        everMissed: true,
+        firstSeenAt: day(35 + Math.floor(rand() * 8)),
+        lastSeenAt: day(1 + Math.floor(rand() * 4)),
+      };
+    }
+    return {
+      word, seen, clean: seen, mispronounced: 0, omitted: 0,
+      cleanStreak: seen, everMissed: false,
+      firstSeenAt: day(20 + Math.floor(rand() * 15)),
+      lastSeenAt: day(Math.floor(rand() * 5)),
+    };
+  };
+
+  return [
+    make('pickled', 'struggling'),
+    make('peppers', 'struggling'),
+    make('sixth', 'struggling'),
+    make('rural', 'struggling'),
+    make('thoroughly', 'struggling'),
+    make('phenomenon', 'mastered'),
+    make('squirrel', 'mastered'),
+    make('brewery', 'mastered'),
+    make('statistics', 'clean'),
+    make('particular', 'clean'),
+  ];
 }
 
 export function installDevHandle(store: HistoryStore) {

@@ -23,10 +23,22 @@ A human reviews and merges; you never merge.
 ## Constraint: no microphone
 
 The simulator has no speech input. You cannot complete a reading or
-freestyle session. If the issue requires real speech to reproduce, walk the
-path as far as the recording screen, post what you observed on the issue,
-and stop — do not fix blind. Everything else (library, passage editor,
-analytics, history, settings) is fully drivable.
+freestyle session. If the issue requires you to actually SPEAK to
+reproduce, walk the path as far as the recording screen, post what you
+observed on the issue, and stop — do not fix blind. Everything else
+(library, passage editor, analytics, history, settings) is fully drivable.
+
+## Seeding practice history
+
+Simulator builds ship a seed hook. If the issue needs existing practice
+data — analytics, streaks, session history, "Words to master", "Practice
+All" — seed it first:
+`npx --yes eas-cli@latest simulator:exec npx agent-device@latest open "clarity.preview://dev-seed" --platform ios`
+(expect the system "Open in Clarity (Preview)?" dialog on first use; press
+Open). The screen confirms with "Seeded ✓". It plants 45 days of
+deterministic history plus word stats, and it is idempotent. Then navigate
+back to the relevant screen. Do not treat seeded data as the bug — it is
+fixture data.
 
 ## EAS Simulator: how to drive it
 
