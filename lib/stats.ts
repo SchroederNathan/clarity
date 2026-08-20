@@ -242,7 +242,15 @@ export type DayScore = {
   /** Sessions on the day, including ones excluded from scoring, so a day whose
    * only session was too short reads "practiced, not scored" rather than empty. */
   sessions: number;
+  /** Rounded practice minutes on the day, for detail surfaces like a chart
+   * tooltip. Includes unscorable sessions for the same reason `sessions` does. */
+  minutes: number;
 };
+
+/** Rounded practice minutes across a list of sessions. */
+function sumMinutes(list: readonly SessionRecord[]): number {
+  return Math.round(list.reduce((sum, r) => sum + r.durationMs / 60_000, 0));
+}
 
 /** Per-day speaking score for the last `days` days ending today, oldest first. */
 export function dailySpeakingScores(
@@ -268,6 +276,63 @@ export function dailySpeakingScores(
       score: list.length ? speakingScore(list) : null,
       skillCount: SKILL_ORDER.filter((k) => window[k].samples > 0).length,
       sessions: list.length,
+      minutes: sumMinutes(list),
+    });
+  }
+  return out;
+}
+
+export type WeekScore = {
+  /** dayKeys of the bucket's first and last day, both inclusive. */
+  startKey: string;
+  endKey: string;
+  /** null when the week has no scorable session. */
+  score: number | null;
+  /** Skills the week was scored on — same partial-coverage semantics as
+   * `DayScore.skillCount`. */
+  skillCount: number;
+  sessions: number;
+  minutes: number;
+};
+
+/**
+ * Per-week speaking score over the whole history, oldest first, for the
+ * all-time chart. Buckets are 7 calendar days aligned so the LAST bucket ends
+ * today — daily bars over months of history are unreadable, and a partial
+ * "this week" bucket at the end would dip for no reason other than being
+ * half-elapsed.
+ *
+ * Scores derive from the bucket's records via `speakingScore`, never from a
+ * stored per-day value, for the same reason `dailySpeakingScores` does.
+ */
+export function weeklySpeakingScores(
+  records: readonly SessionRecord[],
+  now: number,
+): WeekScore[] {
+  if (records.length === 0) return [];
+  const first = startOfLocalDay(records[0].completedAt);
+  const spanDays = Math.max(1, Math.round((startOfLocalDay(now) - first) / 86_400_000) + 1);
+  const weeks = Math.ceil(spanDays / 7);
+
+  const out: WeekScore[] = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const endOffset = -(w * 7);
+    const startOffset = endOffset - 6;
+    const start = startOfLocalDayOffset(now, startOffset);
+    // The current bucket is unbounded above: `now` only advances at midnight
+    // and on foreground, so bounding by it would drop a just-saved session.
+    const list =
+      w === 0
+        ? recordsSince(records, start)
+        : recordsBetween(records, start, startOfLocalDayOffset(now, endOffset + 1));
+    const window = skillWindow(list);
+    out.push({
+      startKey: dayKeyOffset(now, startOffset),
+      endKey: dayKeyOffset(now, endOffset),
+      score: list.length ? speakingScore(list) : null,
+      skillCount: SKILL_ORDER.filter((k) => window[k].samples > 0).length,
+      sessions: list.length,
+      minutes: sumMinutes(list),
     });
   }
   return out;
@@ -529,8 +594,6 @@ export function speakingSummary(
     }
   }
 
-  const sumMinutes = (list: readonly SessionRecord[]) =>
-    Math.round(list.reduce((sum, r) => sum + r.durationMs / 60_000, 0));
   const minutes = sumMinutes(thisWeek);
   const currentStreak = streak(records, now);
 

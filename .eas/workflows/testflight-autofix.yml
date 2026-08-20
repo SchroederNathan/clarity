@@ -1,0 +1,90 @@
+# TestFlight feedback in, verified fix PR out — one workflow run.
+#
+# Modeled on brentvatne/euxy (crash-triage.yml / feedback-triage.yml):
+# the App Store Connect beta_feedback event triggers the run directly and
+# the same run carries the work all the way to a PR. No GitHub label
+# bridge in this path; labeling an issue `repro` by hand still works and
+# dispatches agent-fix.yml as before.
+#
+# Two triggers, one job, two agent steps on the same VM:
+#   1. Triage (.agents/triage-prompt.md): fetch feedback via
+#      `eas testflight:feedback` (ASC key comes from the EAS credentials
+#      service), dedupe against existing issues, cluster, pick at most ONE
+#      auto-fixable item, file it as an issue labeled `testflight`, and
+#      write the issue number to TRIAGE_ISSUE_NUMBER.
+#   2. Fix (.agents/fix-prompt.md, unchanged): if TRIAGE_ISSUE_NUMBER
+#      exists, run the existing repro -> fix -> verify -> PR loop against
+#      that issue in this same run.
+#
+# Triggers:
+#   - beta_feedback event (requires the ASC connection in EAS project
+#     settings). The trigger context injects the submission id/type/url.
+#   - daily 13:00 UTC cron sweep: ASC events occasionally do not fire.
+#     The sweep lists screenshot feedback only; crashes are fetchable only
+#     by id from the event context. Crons run from the default branch.
+#
+# Idempotent: every filed issue carries a TestFlight-Feedback-IDs footer
+# the triage agent dedupes against, so overlapping event + cron runs file
+# nothing twice. The issue gets `testflight`, NOT `repro` — the `repro`
+# label would fire the GitHub bridge and dispatch a duplicate fix run.
+#
+# Required EAS environment variables (production environment) — all
+# already present for agent-fix.yml:
+#   CLAUDE_CODE_OAUTH_TOKEN - headless Claude Code auth (`claude setup-token`).
+#                             Do NOT also set ANTHROPIC_API_KEY.
+#   GITHUB_TOKEN            - fine-grained PAT: Issues, Contents,
+#                             Pull requests (read/write)
+#   EXPO_TOKEN              - eas-cli auth: testflight:feedback, simulator
+#                             sessions, and the verification build
+name: TestFlight autofix (feedback -> issue -> fix -> verified PR)
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  app_store_connect:
+    beta_feedback:
+      types:
+        - crash
+        - screenshot
+
+jobs:
+  autofix:
+    name: Triage TestFlight feedback, then fix it in the same run
+    environment: production
+    env:
+      # Empty on cron runs; set on beta_feedback event runs.
+      FEEDBACK_ID: ${{ app_store_connect.beta_feedback.id }}
+      FEEDBACK_TYPE: ${{ app_store_connect.beta_feedback.type }}
+      FEEDBACK_URL: ${{ app_store_connect.beta_feedback.url }}
+      # .env.local is not on the worker, but be explicit: the submit
+      # profile must resolve the production bundle id, not the .dev one.
+      APP_VARIANT: production
+    steps:
+      - uses: eas/checkout
+      # eas-cli evaluates app.config.ts, which needs node_modules.
+      - uses: eas/install_node_modules
+      - name: Triage feedback into an issue
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest
+          # --dangerously-skip-permissions: same rationale as agent-fix.yml
+          # (allowlist patterns reject commands expanding GITHUB_TOKEN).
+          # Safe here: ephemeral single-purpose VM with scoped secrets.
+          claude -p "$(cat .agents/triage-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 60 \
+            --output-format json
+      - name: Fix the filed issue in this run
+        run: |
+          if [ ! -f TRIAGE_ISSUE_NUMBER ]; then
+            echo "Triage filed no auto-fixable issue; nothing to fix."
+            exit 0
+          fi
+          ISSUE_NUMBER="$(cat TRIAGE_ISSUE_NUMBER)"
+          # consume the handoff so it can't ride along in the fix commit
+          rm TRIAGE_ISSUE_NUMBER
+          case "$ISSUE_NUMBER" in ''|*[!0-9]*) echo "invalid TRIAGE_ISSUE_NUMBER" >&2; exit 1;; esac
+          export ISSUE_NUMBER
+          claude -p "$(cat .agents/fix-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 120 \
+            --output-format json

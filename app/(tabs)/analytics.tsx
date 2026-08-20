@@ -13,6 +13,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RecordsCard, type RecordRow } from '@/components/analytics/records-card';
+import { type ScoreChartPoint } from '@/components/analytics/score-chart';
 import { SpeakingScoreCard } from '@/components/analytics/speaking-score-card';
 import { EmptyStateCard } from '@/components/empty-state-card';
 import { useMinimizeOnScroll } from '@/components/glass-tabs';
@@ -26,19 +27,25 @@ import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSessionRecords, useWords } from '@/hooks/use-session-history';
 import { useNow } from '@/hooks/use-now';
 import { useSpeakingSummary } from '@/hooks/use-speaking-summary';
-import { formatDayRange, timeAgo } from '@/lib/format';
+import { formatDayDetail, formatDayRange, formatMonthDay, timeAgo, weekdayInitial } from '@/lib/format';
 import { speakingScore } from '@/lib/score';
-import { bestSession, longestStreakRange, startOfLocalDay, totals } from '@/lib/stats';
+import {
+  bestSession,
+  dayKeyToMs,
+  longestStreakRange,
+  startOfLocalDay,
+  totals,
+  weeklySpeakingScores,
+} from '@/lib/stats';
 
 const MODE_LABELS = { passage: 'Passage', drill: 'Drill', freestyle: 'Freestyle' } as const;
 
 const RANGES = ['Week', 'Month', 'All time'] as const;
 /** Days each range scores over. All time is resolved from the first record. */
 const RANGE_DAYS = [7, 30, null] as const;
-/** Hundreds of daily bars are unreadable, so the all-time chart shows the most
- * recent stretch while the score above it covers everything. The section
- * subtitle says so. */
-const MAX_CHART_DAYS = 30;
+/** What the score delta is measured against, per range. All time has no prior
+ * window by construction, so its delta is always null and needs no suffix. */
+const DELTA_SUFFIXES = ['this week', 'this month', undefined] as const;
 
 export default function AnalyticsScreen() {
   useMarkInteractive();
@@ -59,8 +66,39 @@ export default function AnalyticsScreen() {
     return Math.max(1, Math.round((startOfLocalDay(now) - first) / 86_400_000) + 1);
   }, [range, records, now]);
 
-  const summary = useSpeakingSummary(windowDays, Math.min(windowDays, MAX_CHART_DAYS));
+  const summary = useSpeakingSummary(windowDays);
   const { mastered } = useWords();
+
+  // What the chart plots. Week and month plot the window's days; all time
+  // plots the WHOLE history as weekly buckets instead of truncating, so the
+  // chart finally covers the same span as the score above it.
+  const chartPoints = useMemo<ScoreChartPoint[]>(() => {
+    if (range === 2) {
+      return weeklySpeakingScores(records, now).map((week, i, all) => ({
+        key: week.startKey,
+        label: formatMonthDay(dayKeyToMs(week.startKey)),
+        detail: formatDayRange(dayKeyToMs(week.startKey), dayKeyToMs(week.endKey)),
+        score: week.score,
+        sessions: week.sessions,
+        minutes: week.minutes,
+        skillCount: week.skillCount,
+        isCurrent: i === all.length - 1,
+      }));
+    }
+    return summary.days.map((day, i, all) => {
+      const ms = dayKeyToMs(day.dayKey);
+      return {
+        key: day.dayKey,
+        label: range === 0 ? weekdayInitial(ms) : formatMonthDay(ms),
+        detail: formatDayDetail(ms),
+        score: day.score,
+        sessions: day.sessions,
+        minutes: day.minutes,
+        skillCount: day.skillCount,
+        isCurrent: i === all.length - 1,
+      };
+    });
+  }, [range, records, now, summary.days]);
 
   // All-time bests. Every value derives from the stored skills, so records
   // written before the score definition changed still rank correctly.
@@ -150,9 +188,6 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const chartTruncated = windowDays > summary.days.length;
-  const rangeLabel = RANGES[range].toLowerCase();
-
   return (
     <Animated.ScrollView {...scroll}>
       {header}
@@ -161,12 +196,9 @@ export default function AnalyticsScreen() {
         <SpeakingScoreCard
           score={summary.score}
           delta={summary.scoreDelta ?? undefined}
-          days={summary.days}
-          chartNote={
-            chartTruncated
-              ? `Score covers all ${windowDays} days; the chart shows the last ${summary.days.length}.`
-              : undefined
-          }
+          deltaSuffix={DELTA_SUFFIXES[range]}
+          points={chartPoints}
+          note={range === 2 ? 'Each bar is one week.' : undefined}
         />
       </IntroReveal>
 

@@ -1,20 +1,36 @@
-# Clarity agentic workflow — "Tag an issue, get a fix"
+# Clarity agentic workflows — TestFlight feedback in, verified fix PR out
 
-Label a GitHub issue `repro` and one agent does the whole loop inside a
-single EAS Workflows job: it reproduces the bug on an
-[EAS Simulator](https://docs.expo.dev/), posts the evidence to the issue,
-writes the minimal fix, verifies it on a second simulator session, and
-opens a PR with before/after screenshots and links to both session videos.
-A human reviews and merges.
+Two entry points, one fix loop:
+
+- **TestFlight autofix** (`testflight-autofix.yml`): a tester submits
+  crash or screenshot feedback and one EAS Workflows run carries it all
+  the way to a PR — triage the feedback into a GitHub issue, reproduce it
+  on an [EAS Simulator](https://docs.expo.dev/), fix, verify on a second
+  simulator session, open a PR with screenshots and both session videos.
+- **Manual** ("tag an issue, get a fix"): label any GitHub issue `repro`
+  and the same fix loop runs via agent-fix.yml.
+
+A human reviews and merges; agents never merge.
 
 ## The loop
 
 ```
-issue labeled `repro`
-   │  .github/workflows/agent-repro-dispatch.yml
-   │  (thin bridge — EAS has no issue-label trigger yet)
+TestFlight tester submits crash/screenshot feedback
+   │  testflight-autofix.yml — fired by the App Store Connect
+   │  beta_feedback event AND a daily 13:00 UTC cron sweep
+   │
+   │  step 1 — triage agent (.agents/triage-prompt.md):
+   │    fetch via `eas testflight:feedback`, dedupe by the
+   │    TestFlight-Feedback-IDs footer, cluster + score, file at
+   │    most ONE issue labeled `testflight`, write the issue number
+   │    to TRIAGE_ISSUE_NUMBER (speech-dependent reports get
+   │    `needs-human` and stop — the simulator has no microphone)
+   │
+   │  step 2 — fix agent (.agents/fix-prompt.md), same run:
    ▼
-agent-fix.yml — ONE EAS Workflows job (Linux), ONE agent
+fix loop (also reachable via: human labels an issue `repro`
+   │        → .github/workflows/agent-repro-dispatch.yml
+   │        → agent-fix.yml)
    │ 1. read the issue
    │ 2. EAS Simulator session: install latest simulator build, repro, screenshots
    │ 3. issue comment: steps + observations + ▶ session video link
@@ -27,9 +43,29 @@ PR labeled `agent-fix`
    ▶ repro video · ▶ verified-fix video
 ```
 
-The agent prompt is `.agents/fix-prompt.md`. The device work uses
-`eas simulator:*` + `agent-device` — plain shell commands, no MCP, no
-macOS worker.
+The device work uses `eas simulator:*` + `agent-device` — plain shell
+commands, no MCP, no macOS worker.
+
+The autofix design follows brentvatne/euxy (crash-triage.yml +
+feedback-triage.yml): the `beta_feedback` trigger with its
+`${{ app_store_connect.* }}` context, and `eas testflight:feedback` for
+the content (the ASC API key comes from the EAS credentials service, so
+no ASC secrets live in this repo). The autofix issue is labeled
+`testflight`, NOT `repro` — `repro` would fire the GitHub bridge and
+dispatch a duplicate fix run.
+
+Autofix one-time setup, on top of the setup below:
+
+1. **No new secrets.** The existing `production` env vars cover it:
+   `GITHUB_TOKEN` (issue writes), `EXPO_TOKEN` (eas-cli + the stored ASC
+   key), `CLAUDE_CODE_OAUTH_TOKEN`.
+2. **ASC event trigger**: connect App Store Connect in the EAS dashboard
+   project settings, or the `beta_feedback` trigger never fires. The
+   daily cron still sweeps screenshot feedback without it, but crashes
+   are only fetchable by submission id from the event context.
+3. Crons only run from the default branch, so the workflow must be on
+   `main`.
+4. Manual run: `eas workflow:run .eas/workflows/testflight-autofix.yml`.
 
 ## One-time setup
 
