@@ -12,6 +12,7 @@ import { IntroRevealProvider, SplashOverlay } from '@/components/splash';
 import { fontAssets, fonts } from '@/constants/theme';
 import { useIntroReveal } from '@/hooks/use-intro-reveal';
 import { AppReadyProvider } from '@/hooks/use-mark-interactive';
+import { SubscriptionProvider } from '@/hooks/use-subscription';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -77,54 +78,72 @@ function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Observe's TTI is reported by each screen, but only once the splash
-          overlay is gone: until then it covers the routes and eats every
-          touch, so the app is not interactive no matter what has rendered. */}
-      <AppReadyProvider value={splashDone}>
-        <IntroRevealProvider value={revealed}>
-          <NavThemeProvider>
-            {fontsReady || fontError ? (
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="session"
-                  options={{ presentation: 'fullScreenModal', headerShown: false }}
+      {/* Configures RevenueCat and holds the Clarity Pro entitlement for every
+          screen. Above the routes so the first render of any screen can already
+          branch on it, and outside the font gate so the SDK starts its first
+          customer-info read while the fonts load. */}
+      <SubscriptionProvider>
+        {/* Observe's TTI is reported by each screen, but only once the splash
+            overlay is gone: until then it covers the routes and eats every
+            touch, so the app is not interactive no matter what has rendered. */}
+        <AppReadyProvider value={splashDone}>
+          <IntroRevealProvider value={revealed}>
+            <NavThemeProvider>
+              {fontsReady || fontError ? (
+                <Stack>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="session"
+                    options={{ presentation: 'fullScreenModal', headerShown: false }}
+                  />
+                  {/* Keeps its native header: a custom left-placed title and the
+                      close button live in the stack toolbar (Stack.Toolbar inside
+                      the route). The shared progressive blur lets the form scroll
+                      beneath the toolbar without introducing a hard material edge. */}
+                  <Stack.Screen
+                    name="passage-editor"
+                    options={{
+                      presentation: 'modal',
+                      title: '',
+                      headerTransparent: true,
+                      headerShadowVisible: false,
+                      headerBlurEffect: 'none',
+                      headerBackground: () => (
+                        <ProgressiveBlur
+                          direction="top"
+                          tint={scheme}
+                          style={{ flex: 1 }}
+                        />
+                      ),
+                    }}
+                  />
+                  {/* Both draw their own close button and their own scrolling
+                      (the paywall is ours, the Customer Center is a RevenueCat-
+                      hosted native view), so they take the whole modal with no
+                      header of ours on top. */}
+                  <Stack.Screen
+                    name="paywall"
+                    options={{ presentation: 'modal', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="manage-subscription"
+                    options={{ presentation: 'modal', headerShown: false }}
+                  />
+                </Stack>
+              ) : null}
+              {/* The splash backdrop inverts the scheme (light mode plays on
+                  black), so pin the status bar to stay legible until it's gone. */}
+              <StatusBar style={splashDone ? 'auto' : scheme} />
+              {!splashDone ? (
+                <SplashOverlay
+                  onReveal={() => setRevealed(true)}
+                  onDone={() => setSplashDone(true)}
                 />
-                {/* Keeps its native header: a custom left-placed title and the
-                    close button live in the stack toolbar (Stack.Toolbar inside
-                    the route). The shared progressive blur lets the form scroll
-                    beneath the toolbar without introducing a hard material edge. */}
-                <Stack.Screen
-                  name="passage-editor"
-                  options={{
-                    presentation: 'modal',
-                    title: '',
-                    headerTransparent: true,
-                    headerShadowVisible: false,
-                    headerBlurEffect: 'none',
-                    headerBackground: () => (
-                      <ProgressiveBlur
-                        direction="top"
-                        tint={scheme}
-                        style={{ flex: 1 }}
-                      />
-                    ),
-                  }}
-                />
-              </Stack>
-            ) : null}
-            {/* The splash backdrop inverts the scheme (light mode plays on
-                black), so pin the status bar to stay legible until it's gone. */}
-            <StatusBar style={splashDone ? 'auto' : scheme} />
-            {!splashDone ? (
-              <SplashOverlay
-                onReveal={() => setRevealed(true)}
-                onDone={() => setSplashDone(true)}
-              />
-            ) : null}
-          </NavThemeProvider>
-        </IntroRevealProvider>
-      </AppReadyProvider>
+              ) : null}
+            </NavThemeProvider>
+          </IntroRevealProvider>
+        </AppReadyProvider>
+      </SubscriptionProvider>
     </GestureHandlerRootView>
   );
 }

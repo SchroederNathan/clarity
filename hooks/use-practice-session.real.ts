@@ -18,6 +18,7 @@ import { assessSession } from '@/services/azure-pronunciation';
 import {
   buildContextualStrings,
   selectBestHypothesis,
+  withBorrowedTimings,
 } from '@/services/live-recognition';
 import { claimEngine, releaseEngine } from '@/services/recognition-owner';
 import {
@@ -325,17 +326,17 @@ export function usePracticeSession(passage: Passage): PracticeSession {
     const m = machineRef.current!;
     if (m.status !== 'listening' && m.status !== 'processing' && m.status !== 'paused') return;
     const atActiveMs = activeMs();
-    const best = selectBestHypothesis(
-      (event.results ?? []).map((candidate) => ({
-        transcript: candidate.transcript ?? '',
-        confidence: candidate.confidence,
-        segments: candidate.segments,
-      })),
-      m.aligner,
-      event.isFinal,
-      atActiveMs,
-    );
-    if (!best) return;
+    const hypotheses = (event.results ?? []).map((candidate) => ({
+      transcript: candidate.transcript ?? '',
+      confidence: candidate.confidence,
+      segments: candidate.segments,
+    }));
+    const chosen = selectBestHypothesis(hypotheses, m.aligner, event.isFinal, atActiveMs);
+    if (!chosen) return;
+    // Word timings ride only on the first alternative. When a rescored one wins
+    // and tokenizes identically, the timings still describe the same audio, so
+    // reattach them rather than falling back to event arrival times.
+    const best = withBorrowedTimings(chosen, hypotheses);
     m.autoRestarts = 0; // real progress — reset the restart budget
     m.lastTransientError = null;
     m.aligner.handleEvent({
@@ -516,6 +517,10 @@ export function usePracticeSession(passage: Passage): PracticeSession {
     const durationMs = Math.max(1, Math.round(m.accumulatedActiveMs));
     const aligner = m.aligner;
     const statuses = aligner.refWordStatuses();
+    // Live pace, used only until Azure's word offsets replace it in
+    // buildAzureResult. Dividing matched words by the whole active session was
+    // biased low twice over (see paceWpmFromTimings); this is the same measure
+    // the fallback has always used, kept as the fallback.
     const paceWpm =
       aligner.matchedCount > 0 && durationMs >= 1_000
         ? Math.round(aligner.matchedCount / (durationMs / 60_000))
@@ -582,6 +587,7 @@ export function usePracticeSession(passage: Passage): PracticeSession {
       paceWpm,
       targetWpm: passage.targetWpm,
       fillerCount: aligner.fillerCount,
+      discourseMarkerCount: aligner.discourseMarkerCount,
       durationMs,
       audioUri,
       waveform: waveform ?? waveformFromMeterHistory(m.meterHistory),
@@ -605,7 +611,15 @@ export function usePracticeSession(passage: Passage): PracticeSession {
             referenceText: c.referenceText,
           }));
           const assessments = await assessSession(wavChunks, { key, region });
-          const azure = buildAzureResult({ ...base, chunks, assessments });
+          const azure = buildAzureResult({
+            ...base,
+            chunks,
+            assessments,
+            segments: {
+              durationsMs: segmentDurations,
+              activeStartMs: m.segmentActiveStartMs,
+            },
+          });
           if (azure) return azure;
         }
       } catch (e) {
@@ -756,6 +770,7 @@ export function usePracticeSession(passage: Passage): PracticeSession {
             paceWpm: 0,
             targetWpm: passage.targetWpm,
             fillerCount: m.aligner.fillerCount,
+            discourseMarkerCount: m.aligner.discourseMarkerCount,
             durationMs: Math.max(1, Math.round(m.accumulatedActiveMs)),
             audioUri: null,
             waveform: waveformFromMeterHistory(m.meterHistory),

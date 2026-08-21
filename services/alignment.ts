@@ -22,7 +22,7 @@
 // Filler lexicon (shared with the freestyle session), applied here to
 // final-committed insertions only (words that did NOT match the reference —
 // "so" spoken where the passage says "so" is never a filler).
-import { FILLER_BIGRAMS, FILLER_UNIGRAMS } from '@/lib/fillers';
+import { DISCOURSE_MARKERS, FILLER_BIGRAMS, FILLER_UNIGRAMS } from '@/lib/fillers';
 import { normalizeToken, type TokenizedPassage } from '@/lib/passage-text';
 
 /** Kept as a public compatibility constant for the self-tests and callers. */
@@ -82,8 +82,11 @@ export type CommittedInsertion = {
   atActiveMs: number;
   /** Last matched matchable index before this insertion; -1 when none. */
   afterMatchableIndex: number;
-  /** Whether the filler lexicon matched this insertion (bigrams flag both tokens). */
+  /** Whether the scored filler lexicon matched this insertion (bigrams flag both tokens). */
   filler: boolean;
+  /** An ambiguous discourse marker (`like`, `so`, `well`). Reported to the AI
+   * coach, never scored — see lib/fillers.ts. */
+  discourseMarker: boolean;
 };
 
 type Token = { raw: string; norm: string; endMs: number | null };
@@ -279,6 +282,8 @@ export class PassageAligner {
   private interim = false;
 
   fillerCount = 0;
+  /** Ambiguous markers in committed insertions. Not part of any score. */
+  discourseMarkerCount = 0;
 
   private wpmSamples: { atMs: number; matched: number }[] = [];
 
@@ -572,6 +577,8 @@ export class PassageAligner {
           }
         }
         run.forEach((entry, j) => {
+          const discourseMarker = !fillerAt[j] && DISCOURSE_MARKERS.has(entry.token.norm);
+          if (discourseMarker) this.discourseMarkerCount++;
           this.committedInsertions.push({
             norm: entry.token.norm,
             raw: entry.token.raw,
@@ -580,6 +587,7 @@ export class PassageAligner {
             atActiveMs: event.atActiveMs,
             afterMatchableIndex: entry.afterRef,
             filler: fillerAt[j],
+            discourseMarker,
           });
         });
       }
@@ -663,6 +671,7 @@ export class PassageAligner {
     this.pending = { ...EMPTY_PENDING };
     this.interim = false;
     this.fillerCount = 0;
+    this.discourseMarkerCount = 0;
     this.wpmSamples = [];
   }
 }

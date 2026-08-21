@@ -4,20 +4,43 @@
  * mapping back onto the passage's display tokens, and the live-fallback
  * result builder used when Azure is unavailable or fails.
  *
- * PURE module (type-only import from azure-pronunciation): runs under bun
+ * PURE module (types only from azure-assessment, itself pure): runs under bun
  * for the self-test scripts.
  */
 
-import type { TokenizedPassage } from '@/lib/passage-text';
+import { normalizeToken, type TokenizedPassage } from '@/lib/passage-text';
 import { clampScore, fillerScore, paceScore, PAUSE_MIN_MS, speakingScore } from '@/lib/score';
-import type { ResultWord, SessionResult, WordVerdict } from '@/types/session';
+import type {
+  ResultPhoneme,
+  ResultSyllable,
+  ResultWord,
+  SessionResult,
+  WordVerdict,
+} from '@/types/session';
+import { mapAssessedWords } from './assessment-mapping';
 import type { CommittedInsertion, RefWordStatus, WordCommit } from './alignment';
-import type { ChunkAssessment } from './azure-pronunciation';
+import type { AzureWordResult, ChunkAssessment } from './azure-assessment';
+
+/** The bundler injects `__DEV__`; bun does not, and this module runs there for
+ * the self-tests. */
+const IS_DEV = typeof __DEV__ !== 'undefined' && __DEV__;
 
 /** Azure short-audio caps assessment audio at 30s — pack chunks to 28s. */
 export const MAX_CHUNK_MS = 28_000;
-const CHUNK_LEAD_MS = 150;
-const CHUNK_TAIL_MS = 350;
+/**
+ * Padding around a chunk's audio span.
+ *
+ * Both were far tighter (150/350) and clipped boundary words. A chunk begins
+ * where the previous one's last word was timed to end, and that timestamp
+ * carries real error: interpolated across an utterance when the recognizer gave
+ * only span timings, and lagging the audio outright when it gave none. Too
+ * little lead cuts the first word's onset consonant off, and Azure grades a
+ * beheaded word as a mispronunciation. Overlapping into a neighbour is cheap by
+ * comparison: `EnableMiscue` reports the intruding word as an Insertion, which
+ * `mapAssessedWords` anchors and discards.
+ */
+const CHUNK_LEAD_MS = 400;
+const CHUNK_TAIL_MS = 600;
 
 export type SentenceChunk = {
   /** Recording segment (pause/resume cycle) the audio lives in. */
@@ -242,6 +265,72 @@ export function pauseStats(
   return { pauseCount, longestPauseMs };
 }
 
+/** A spoken word's span on the session's active-ms timeline. */
+export type WordTiming = { startMs: number; endMs: number };
+
+/**
+ * Pauses from real word spans, which is what Azure's per-word offsets give us.
+ *
+ * Strictly better than `pauseStats`, and different in kind: that one only has
+ * END times, so it measures end-to-end gaps and counts each word's own duration
+ * as part of the silence before it. With a start and an end per word the gap is
+ * the actual silence between them.
+ */
+export function pauseStatsFromTimings(timings: readonly WordTiming[]): {
+  pauseCount: number;
+  longestPauseMs: number;
+} {
+  const sorted = [...timings].sort((a, b) => a.startMs - b.startMs);
+  let pauseCount = 0;
+  let longestPauseMs = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i].startMs - sorted[i - 1].endMs;
+    if (gap >= PAUSE_MIN_MS) {
+      pauseCount += 1;
+      longestPauseMs = Math.max(longestPauseMs, gap);
+    }
+  }
+  return { pauseCount, longestPauseMs };
+}
+
+/** A pace measurement needs a span this long to mean anything. */
+const MIN_PACE_SPAN_MS = 2_000;
+
+/**
+ * Words per minute over the span actually spent speaking: first word's onset to
+ * last word's release.
+ *
+ * The old measure divided matched words by the WHOLE active session, which was
+ * biased low twice over. Time before the first word and after the last one is
+ * not reading time, and it went straight into the denominator: three seconds of
+ * getting settled on a 20-second read cost 15% of the measured pace. And the
+ * numerator counted only words live alignment matched, so every word the
+ * recognizer missed made the reader look slower than they were. `paceScore`
+ * reaches zero at 0.4x target, so neither bias was cosmetic.
+ *
+ * Returns 0 when there is not enough signal, which callers already treat as
+ * "pace was not measured" rather than as a bad pace.
+ */
+export function paceWpmFromTimings(timings: readonly WordTiming[]): number {
+  if (timings.length < 2) return 0;
+  let earliest = Infinity;
+  let latest = -Infinity;
+  for (const t of timings) {
+    earliest = Math.min(earliest, t.startMs);
+    latest = Math.max(latest, t.endMs);
+  }
+  const spanMs = latest - earliest;
+  if (!Number.isFinite(spanMs) || spanMs < MIN_PACE_SPAN_MS) return 0;
+  return Math.round(timings.length / (spanMs / 60_000));
+}
+
+/**
+ * Everything known about one display token before it becomes a `ResultWord`.
+ * Carries the whole Azure detail tier, not just a verdict and a score, so the
+ * phoneme data survives assembly instead of being dropped on the floor.
+ */
+type VerdictCell = Omit<ResultWord, 'word' | 'status'> & { verdict: WordVerdict };
+
 /**
  * Base per-display-token verdicts from live alignment. Punctuation-only
  * tokens inherit their preceding word's verdict so omitted runs render
@@ -250,12 +339,12 @@ export function pauseStats(
 function baseVerdicts(
   tokenized: TokenizedPassage,
   statuses: RefWordStatus[],
-): { verdict: WordVerdict; score?: number }[] {
+): VerdictCell[] {
   const displayToMatchable = new Map<number, number>();
   tokenized.matchableIndices.forEach((displayIdx, matchableIdx) => {
     displayToMatchable.set(displayIdx, matchableIdx);
   });
-  const out: { verdict: WordVerdict; score?: number }[] = [];
+  const out: VerdictCell[] = [];
   let previous: WordVerdict = 'good';
   for (let d = 0; d < tokenized.words.length; d++) {
     const m = displayToMatchable.get(d);
@@ -273,15 +362,15 @@ function baseVerdicts(
 /** Assemble ResultWord[] from per-display verdicts plus spliced insertions. */
 function assembleWords(
   tokenized: TokenizedPassage,
-  verdicts: { verdict: WordVerdict; score?: number }[],
+  verdicts: VerdictCell[],
   insertionsAfterDisplay: Map<number, ResultWord[]>,
 ): ResultWord[] {
   const out: ResultWord[] = [];
   const leading = insertionsAfterDisplay.get(-1);
   if (leading) out.push(...leading);
   tokenized.words.forEach((word, d) => {
-    const v = verdicts[d];
-    out.push(v.score != null ? { word, status: v.verdict, score: v.score } : { word, status: v.verdict });
+    const { verdict, ...detail } = verdicts[d];
+    out.push({ word, status: verdict, ...detail });
     const after = insertionsAfterDisplay.get(d);
     if (after) out.push(...after);
   });
@@ -309,14 +398,30 @@ export type ResultBuildParams = {
   tokenized: TokenizedPassage;
   statuses: RefWordStatus[];
   insertions: CommittedInsertion[];
+  /** Live-derived pace, used when Azure supplied no word timings. */
   paceWpm: number;
   targetWpm: number;
   fillerCount: number;
+  discourseMarkerCount?: number;
   durationMs: number;
   audioUri: string | null;
   waveform: number[];
   pauseCount?: number;
   longestPauseMs?: number;
+};
+
+/**
+ * Where each recording segment sits, so a word's offset inside an assessed chunk
+ * can be placed on two other timelines: the session's active-ms clock (for pace
+ * and pauses) and the concatenated playback WAV (for replaying one word).
+ */
+export type SegmentGeometry = {
+  /** Audio duration of each segment; 0 where the file was missing. Segments are
+   * concatenated in index order, so the durations before segment N are exactly
+   * its offset in the playable WAV. */
+  durationsMs: readonly number[];
+  /** Active-session ms at each segment's start. */
+  activeStartMs: readonly number[];
 };
 
 /**
@@ -328,9 +433,11 @@ export function buildAzureResult(
   params: ResultBuildParams & {
     chunks: SentenceChunk[];
     assessments: (ChunkAssessment | null)[];
+    /** Omit to keep the live pace and pause measures. */
+    segments?: SegmentGeometry;
   },
 ): SessionResult | null {
-  const { tokenized, chunks, assessments, statuses } = params;
+  const { tokenized, chunks, assessments, statuses, segments } = params;
 
   const succeeded = chunks
     .map((chunk, i) => ({ chunk, assessment: assessments[i] }))
@@ -339,37 +446,61 @@ export function buildAzureResult(
 
   const verdicts = baseVerdicts(tokenized, statuses);
   const azureInsertions = new Map<number, ResultWord[]>();
+  /** Spoken-word spans on the active-ms clock, for pace and pauses. */
+  const timings: WordTiming[] = [];
+  let unanchored = 0;
 
-  // Per-word verdict mapping: non-Insertion Azure words consume reference
-  // words in order within the chunk's display range.
   for (const { chunk, assessment } of succeeded) {
+    // Reference tokens this chunk covers, punctuation-only tokens excluded.
     const refDisplayIndices: number[] = [];
+    const refNorms: string[] = [];
     for (let d = chunk.displayStart; d < chunk.displayEnd; d++) {
-      if (tokenized.norms[d] !== '') refDisplayIndices.push(d);
+      if (tokenized.norms[d] === '') continue;
+      refDisplayIndices.push(d);
+      refNorms.push(tokenized.norms[d]);
     }
-    let refPtr = 0;
-    let lastConsumed = chunk.displayStart - 1;
-    for (const w of assessment.words) {
-      if (w.errorType === 'Insertion') {
-        const list = azureInsertions.get(lastConsumed) ?? [];
-        list.push({ word: w.word, status: 'inserted' });
-        azureInsertions.set(lastConsumed, list);
-        continue;
+
+    // Anchored by TEXT: Azure and the tokenizer disagree about compounds, and a
+    // positional walk silently shifted every verdict after the first
+    // disagreement onto the wrong word.
+    const mapped = mapAssessedWords(refDisplayIndices, refNorms, assessment.words);
+    unanchored += mapped.unanchored;
+
+    // A word's chunk-relative offset, placed on the two timelines that matter.
+    const activeBase = (segments?.activeStartMs[chunk.segmentIndex] ?? 0) + chunk.startMs;
+    const playbackBase =
+      (segments?.durationsMs.slice(0, chunk.segmentIndex).reduce((sum, d) => sum + d, 0) ?? 0) +
+      chunk.startMs;
+
+    for (const [displayIndex, word] of mapped.words) {
+      const cell: VerdictCell = { verdict: word.verdict };
+      if (word.score != null) cell.score = clampScore(word.score);
+      if (word.phonemes) cell.phonemes = word.phonemes;
+      if (word.syllables) cell.syllables = word.syllables;
+      if (word.prosody) cell.prosody = word.prosody;
+      // Azure's offsets are the only accurate word timings in the pipeline. The
+      // recognizer's are interpolated across an utterance at best and event
+      // arrival times at worst, so prefer these for playback, pace, and pauses.
+      if (segments && word.startMs != null && word.endMs != null) {
+        cell.audioStartMs = playbackBase + word.startMs;
+        cell.audioEndMs = playbackBase + word.endMs;
+        timings.push({ startMs: activeBase + word.startMs, endMs: activeBase + word.endMs });
       }
-      if (refPtr >= refDisplayIndices.length) break; // defensive: count mismatch
-      const d = refDisplayIndices[refPtr++];
-      lastConsumed = d;
-      const verdict: WordVerdict =
-        w.errorType === 'Omission'
-          ? 'omitted'
-          : w.errorType === 'Mispronunciation'
-            ? 'mispronounced'
-            : 'good';
-      verdicts[d] =
-        verdict === 'omitted' || w.accuracyScore == null
-          ? { verdict }
-          : { verdict, score: clampScore(w.accuracyScore) };
+      verdicts[displayIndex] = cell;
     }
+
+    for (const insertion of mapped.insertions) {
+      const list = azureInsertions.get(insertion.afterDisplay) ?? [];
+      list.push({ word: insertion.word, status: 'inserted' });
+      azureInsertions.set(insertion.afterDisplay, list);
+    }
+  }
+
+  if (IS_DEV && unanchored > 0) {
+    console.warn(
+      `[scoring] ${unanchored} assessed word(s) anchored to no reference token. ` +
+        'Their detail is dropped; surrounding verdicts are unaffected.',
+    );
   }
 
   // Re-run punctuation inheritance now that Azure adjusted verdicts.
@@ -413,6 +544,16 @@ export function buildAzureResult(
     Math.min(azureCompleteness, (100 * attempted) / Math.max(1, totalRefWords)),
   );
 
+  // Pace and pauses prefer Azure's word spans over the live measures, which
+  // were derived from recognition-event arrival times. Both fall back to the
+  // live values when Azure returned no timings, so a region or locale that
+  // omits them changes nothing.
+  const azurePace = paceWpmFromTimings(timings);
+  const paceWpm = azurePace > 0 ? azurePace : params.paceWpm;
+  const azurePauses = timings.length >= 2 ? pauseStatsFromTimings(timings) : null;
+  const pauseCount = azurePauses?.pauseCount ?? params.pauseCount ?? null;
+  const longestPauseMs = azurePauses?.longestPauseMs ?? params.longestPauseMs ?? null;
+
   // The score is the mean of the five skills below it (see lib/score.ts), so
   // the hero number always reconciles with the skill rows the UI prints.
   const scored = {
@@ -420,7 +561,7 @@ export function buildAzureResult(
     fluency,
     completeness,
     intonation,
-    paceWpm: params.paceWpm,
+    paceWpm,
     targetWpm: params.targetWpm,
     fillerCount: params.fillerCount,
     durationMs: params.durationMs,
@@ -430,12 +571,13 @@ export function buildAzureResult(
   return {
     ...scored,
     overallScore: speakingScore(scored) ?? 0,
+    discourseMarkerCount: params.discourseMarkerCount,
     words,
     spokenWords: spokenWordCount(words),
     audioUri: params.audioUri,
     waveform: params.waveform,
-    pauseCount: params.pauseCount ?? null,
-    longestPauseMs: params.longestPauseMs ?? null,
+    pauseCount,
+    longestPauseMs,
   };
 }
 
@@ -484,6 +626,7 @@ export function buildLiveFallbackResult(params: ResultBuildParams): SessionResul
   return {
     ...scored,
     overallScore: speakingScore(scored) ?? 0,
+    discourseMarkerCount: params.discourseMarkerCount,
     words,
     spokenWords: spokenWordCount(words),
     audioUri: params.audioUri,
@@ -500,6 +643,7 @@ export type FreestyleResultParams = {
   transcript: string;
   paceWpm: number;
   fillerCount: number;
+  discourseMarkerCount?: number;
   durationMs: number;
   audioUri: string | null;
   waveform: number[];
@@ -536,6 +680,7 @@ export function buildFreestyleResult(params: FreestyleResultParams): SessionResu
   return {
     ...scored,
     overallScore: speakingScore(scored) ?? 0,
+    discourseMarkerCount: params.discourseMarkerCount,
     transcript: params.transcript,
     words: [],
     // No reference text, so the committed transcript is the only evidence of

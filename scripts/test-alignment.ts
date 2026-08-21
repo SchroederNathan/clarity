@@ -13,6 +13,7 @@ import {
 import {
   buildContextualStrings,
   selectBestHypothesis,
+  withBorrowedTimings,
 } from '@/services/live-recognition';
 
 let passed = 0;
@@ -158,10 +159,15 @@ section('fillers: finals only, unigrams + bigrams');
   assertEq(a.fillerCount, 0, 'interim insertion not counted');
 
   a.handleEvent(ev('um we should you know focus on like the plan today', true, 4000));
-  // um (unigram) + you know (bigram = 1) + like (unigram) = 3
-  assertEq(a.fillerCount, 3, 'unigram + bigram + unigram = 3');
+  // um (unigram) + you know (bigram = 1) = 2. `like` is a DISCOURSE MARKER, not
+  // a scored filler: counting it without syntax made "I like coffee" a
+  // disfluency, and fillerScore hits zero at ten per minute.
+  assertEq(a.fillerCount, 2, 'unigram + bigram = 2, ambiguous marker excluded');
   const fillers = a.committedInsertions.filter((i) => i.filler);
-  assertEq(fillers.length, 4, 'four insertion tokens flagged (bigram flags both)');
+  assertEq(fillers.length, 3, 'three insertion tokens flagged (bigram flags both)');
+  const markers = a.committedInsertions.filter((i) => i.discourseMarker);
+  assertEq(markers.map((i) => i.norm), ['like'], 'ambiguous marker tracked separately');
+  assertEq(a.discourseMarkerCount, 1, 'marker counted, never scored');
   const nonFillerWords = a.refWordStatuses().filter((s) => s === 'matched').length;
   assertEq(nonFillerWords, 7, 'reference words still matched around fillers');
 
@@ -324,6 +330,71 @@ section('stop before trailing final: pending interim counts');
   a.handleEvent(ev('alpha beta gamma', false, 1500));
   const statuses = a.refWordStatuses();
   assertEq(statuses, ['matched', 'matched', 'matched', 'unspoken'], 'pending interim overlaid at stop');
+}
+
+// ---------------------------------------------------------------------------
+section('contextual strings: phrase-first, near the frontier');
+{
+  const long = tokenizePassage(
+    Array.from({ length: 200 }, (_, i) => `word${i}`).join(' ') + '.',
+  );
+  const hints = buildContextualStrings(long, 0);
+  assert(
+    hints.some((h) => h.includes(' ')),
+    'a 200-word passage gets phrase hints at the start (it used to get none)',
+  );
+  assertEq(hints[0], 'word0 word1', 'first hint is the phrase at the frontier');
+  assert(hints.length <= 100, 'budget respected');
+
+  // Hints track the frontier rather than restarting from the passage top.
+  const later = buildContextualStrings(long, 120);
+  assertEq(later[0], 'word120 word121', 'hints follow the frontier');
+  assert(
+    !later.includes('word0'),
+    'words already read are not hinted while ones ahead are missing',
+  );
+
+  // Function words are not worth a slot.
+  const common = tokenizePassage('The zebra and the xylophone were in the aardvark house.');
+  const commonHints = buildContextualStrings(common, 0);
+  assert(commonHints.includes('zebra'), 'distinctive word hinted');
+  assert(!commonHints.includes('the'), 'function word not hinted as a unigram');
+}
+
+// ---------------------------------------------------------------------------
+section('hypothesis selection: word timings survive reranking');
+{
+  const tokenized = tokenizePassage('alpha beta gamma delta.');
+  const a = new PassageAligner(tokenized);
+  a.beginSegment(0);
+
+  // The first alternative carries the timings, as both platforms do. A rescored
+  // alternative that is only marginally better must not throw them away: the
+  // Azure audio window is cut from these timestamps.
+  const timed = {
+    transcript: 'alpha beta gamma delta',
+    confidence: 0.4,
+    segments: [
+      { startTimeMillis: 0, endTimeMillis: 1800, segment: 'alpha beta gamma delta' },
+    ],
+  };
+  const untimedNearTie = { transcript: 'alpha beta gamma delta', confidence: 0.9 };
+  const chosen = selectBestHypothesis([timed, untimedNearTie], a, true, 2000);
+  assert(chosen?.segments != null, 'near-tie keeps the timed hypothesis');
+
+  // A clearly better transcript still wins, and then borrows the timings back
+  // because the two tokenize identically.
+  const better = { transcript: 'Alpha, beta gamma delta!', confidence: 0.95 };
+  const winner = selectBestHypothesis([timed, better], a, true, 2000);
+  assert(winner != null, 'a winner is selected');
+  const restored = withBorrowedTimings(winner!, [timed, better]);
+  assert(restored.segments != null, 'identical tokenization borrows the timings back');
+
+  // Different words must NOT borrow: pinning one utterance's timestamps onto
+  // another's words is worse than having none.
+  const different = { transcript: 'omega beta gamma delta', confidence: 0.99 };
+  const notRestored = withBorrowedTimings(different, [timed, different]);
+  assertEq(notRestored.segments, undefined, 'different words do not borrow timings');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

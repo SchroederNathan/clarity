@@ -185,7 +185,11 @@ export default function ResultsScreen() {
           {result.mode === 'freestyle' ? (
             <TranscriptCard transcript={result.transcript ?? ''} />
           ) : (
-            <WordBreakdown words={result.words} />
+            <WordBreakdown
+              words={result.words}
+              source={result.source}
+              audioUri={result.audioUri}
+            />
           )}
         </View>
       </ScrollView>

@@ -20,7 +20,8 @@ function monthDay(ms: number): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
-/** Compact "Aug 3" label, e.g. for a chart axis tick. */
+/** Compact "Aug 3" label, e.g. a chart axis tick or a subscription renewal,
+ * where a relative label would be vaguer than the real date. */
 export function formatMonthDay(ms: number): string {
   return monthDay(ms);
 }
