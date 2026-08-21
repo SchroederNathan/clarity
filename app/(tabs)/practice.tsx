@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,12 +10,11 @@ import { PassageCarousel } from '@/components/passage-carousel';
 import { DrillCard } from '@/components/practice/drill-card';
 import { FreestyleCard } from '@/components/practice/freestyle-card';
 import { AddPassageRow, PassageRow } from '@/components/practice/passage-row';
-import { SectionHeader } from '@/components/practice/section-header';
 import { IntroReveal } from '@/components/splash';
-import { palette } from '@/constants/colors';
+import { SectionHeader, ThemedText } from '@/components/ui';
 import { DRILLS } from '@/constants/drills';
-import { fonts } from '@/constants/fonts';
 import { PASSAGES } from '@/constants/passages';
+import { spacing, TAB_BAR_SCROLL_INSET } from '@/constants/theme';
 import { randomTopic, TOPICS, type FreestyleTopic } from '@/constants/topics';
 import { useCustomPassages } from '@/hooks/use-custom-passages';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
@@ -37,6 +36,10 @@ const CATEGORY_TITLES: Partial<Record<PassageCategory, string>> = {
 
 const DEFAULT_RECOMMEND_SUBTITLE = 'Picks that adapt as you practice';
 
+/** Screen edge padding. Held in a constant because the drills row cancels it
+ * with a negative margin so its cards can bleed to the screen edges. */
+const SCREEN_PADDING = spacing.xl;
+
 function openContent(item: { id: string }) {
   if (item.id.startsWith(FREESTYLE_ID_PREFIX)) {
     router.push(`/session/freestyle?topicId=${freestyleTopicIdFrom(item.id)}`);
@@ -50,8 +53,6 @@ export default function PracticeScreen() {
 
   const onScroll = useMinimizeOnScroll();
   const insets = useSafeAreaInsets();
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? palette.dark : palette.light;
 
   const recommendations = useRecommendations();
   const customPassages = useCustomPassages();
@@ -88,15 +89,15 @@ export default function PracticeScreen() {
       scrollEventThrottle={16}
       style={{ flex: 1 }}
       contentContainerStyle={{
-        paddingTop: insets.top + 24,
-        paddingHorizontal: 20,
-        paddingBottom: 140,
+        paddingTop: insets.top + spacing.xxl,
+        paddingHorizontal: SCREEN_PADDING,
+        paddingBottom: TAB_BAR_SCROLL_INSET,
       }}>
       {/* Same header composition as Home: title left, streak + avatar right
           (glass capsules → transform-only reveal). */}
       <View style={styles.header}>
         <IntroReveal order={0}>
-          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Practice</Text>
+          <ThemedText variant="largeTitle">Practice</ThemedText>
         </IntroReveal>
         <IntroReveal order={0} fade={false}>
           <HeaderActions streak={stats.streak} />
@@ -179,23 +180,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  screenTitle: {
-    fontSize: 34,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.5,
-  },
   drillsRow: {
-    marginHorizontal: -20,
-    marginTop: 8,
+    marginHorizontal: -SCREEN_PADDING,
+    marginTop: spacing.sm,
     // The interactive glass press response grows past the card bounds; the
     // scroll view must not clip it (same finding as PassageCarousel).
     overflow: 'visible',
   },
   drillsContent: {
-    paddingHorizontal: 20,
-    gap: 12,
+    paddingHorizontal: SCREEN_PADDING,
+    gap: spacing.md,
   },
   sectionBody: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
 });

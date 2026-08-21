@@ -2,18 +2,20 @@ import { PauseIcon, PlayIcon } from '@hugeicons-pro/core-solid-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
 import { useResultPlayback } from '@/hooks/use-result-playback';
+import { useTheme } from '@/hooks/use-theme';
 import { formatClock } from '@/lib/metrics';
-import { sessionColors } from '@/constants/session-theme';
 import type { SessionResult } from '@/types/session';
 
-const SECONDARY = { light: '#77777E', dark: '#9E9EA6' } as const;
+const PILL_HEIGHT = 72;
 const PLAY_SIZE = 44;
 const BAR_MAX = 26;
 const BAR_MIN = 6;
+const BAR_WIDTH = 3;
 
 export type PlaybackPillProps = {
   result: SessionResult;
@@ -22,9 +24,7 @@ export type PlaybackPillProps = {
 /** Recording playback: black play circle, the result's static waveform (bars
  * tint as the playhead passes them), and the clock. */
 export function PlaybackPill({ result }: PlaybackPillProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const secondary = SECONDARY[scheme];
+  const { colors } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
 
   const playback = useResultPlayback(result.audioUri, result.durationMs);
@@ -42,17 +42,19 @@ export function PlaybackPill({ result }: PlaybackPillProps) {
   const body = (
     <>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={playback.isPlaying ? 'Pause playback' : 'Play recording'}
         onPress={handleToggle}
-        hitSlop={8}
+        hitSlop={spacing.sm}
         style={({ pressed }) => [
           styles.playCircle,
-          { backgroundColor: colors.pillDark },
-          pressed && { opacity: 0.8 },
+          { backgroundColor: colors.inverseSurface },
+          pressed && styles.pressed,
         ]}>
         <HugeiconsIcon
           icon={playback.isPlaying ? PauseIcon : PlayIcon}
           size={18}
-          color={colors.pillDarkText}
+          color={colors.inverseLabel}
           // Optical centering: the triangle reads left-heavy in a circle.
           style={playback.isPlaying ? undefined : { marginLeft: 2 }}
         />
@@ -66,16 +68,16 @@ export function PlaybackPill({ result }: PlaybackPillProps) {
               styles.bar,
               {
                 height: BAR_MIN + v * (BAR_MAX - BAR_MIN),
-                backgroundColor: i < playedBars ? colors.accent : colors.waveformBar,
+                backgroundColor: i < playedBars ? colors.accent : colors.bar,
               },
             ]}
           />
         ))}
       </View>
 
-      <Text style={[styles.clock, { color: secondary }]}>
+      <ThemedText variant="subhead" tone="secondary" style={styles.clock}>
         {formatClock(playback.isPlaying ? playback.positionMs : result.durationMs)}
-      </Text>
+      </ThemedText>
     </>
   );
 
@@ -84,14 +86,14 @@ export function PlaybackPill({ result }: PlaybackPillProps) {
       {hasGlass ? (
         <GlassView
           glassEffectStyle="regular"
-          style={[StyleSheet.absoluteFill, styles.shape, { backgroundColor: colors.controlCard }]}
+          style={[StyleSheet.absoluteFill, styles.shape, { backgroundColor: colors.glassTintStrong }]}
         />
       ) : (
         <View
           style={[
             StyleSheet.absoluteFill,
             styles.shape,
-            { backgroundColor: colors.controlCardSolid },
+            { backgroundColor: colors.card },
           ]}
         />
       )}
@@ -102,25 +104,26 @@ export function PlaybackPill({ result }: PlaybackPillProps) {
 
 const styles = StyleSheet.create({
   wrap: {
-    height: 72,
-    borderRadius: 36,
-    borderCurve: 'continuous',
+    height: PILL_HEIGHT,
+    borderRadius: radius.full,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    gap: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
   shape: {
-    borderRadius: 36,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
   },
   playCircle: {
     width: PLAY_SIZE,
     height: PLAY_SIZE,
-    borderRadius: PLAY_SIZE / 2,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.8,
   },
   waveform: {
     flex: 1,
@@ -130,12 +133,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   bar: {
-    width: 3,
-    borderRadius: 1.5,
+    width: BAR_WIDTH,
+    borderRadius: BAR_WIDTH / 2,
   },
   clock: {
-    fontSize: 15,
-    fontFamily: fonts.semibold,
     fontVariant: ['tabular-nums'],
   },
 });

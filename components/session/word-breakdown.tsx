@@ -1,9 +1,9 @@
 import { Fragment } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { sessionColors } from '@/constants/session-theme';
+import { ThemedText } from '@/components/ui';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { ResultWord } from '@/types/session';
 
 export type WordBreakdownProps = {
@@ -13,18 +13,16 @@ export type WordBreakdownProps = {
 /** Per-word verdicts over the whole passage: good = foreground,
  * mispronounced = orange, omitted = red strikethrough, inserted = blue. */
 export function WordBreakdown({ words }: WordBreakdownProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const foreground = palette[scheme].foreground;
+  const { colors } = useTheme();
 
   const colorFor = (status: ResultWord['status']) => {
     switch (status) {
       case 'good':
-        return foreground;
+        return colors.foreground;
       case 'mispronounced':
         return colors.warn;
       case 'omitted':
-        return colors.bad;
+        return colors.danger;
       case 'inserted':
         return colors.accent;
     }
@@ -32,8 +30,10 @@ export function WordBreakdown({ words }: WordBreakdownProps) {
 
   return (
     <View>
-      <Text style={[styles.header, { color: foreground }]}>Word Breakdown</Text>
-      <Text style={styles.passage}>
+      <ThemedText variant="title3" weight="bold" style={styles.header}>
+        Word Breakdown
+      </ThemedText>
+      <ThemedText variant="body" weight="medium" style={styles.passage}>
         {words.map((w, i) => (
           <Fragment key={i}>
             <Text
@@ -46,21 +46,18 @@ export function WordBreakdown({ words }: WordBreakdownProps) {
             {i < words.length - 1 ? ' ' : null}
           </Fragment>
         ))}
-      </Text>
+      </ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    fontSize: 20,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   passage: {
-    fontSize: 17,
+    // Looser than `bodyProse`: per-word colors and strikethroughs need the
+    // extra leading to stay legible as a block.
     lineHeight: 26,
-    fontFamily: fonts.medium,
   },
 });

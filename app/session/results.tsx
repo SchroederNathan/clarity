@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SkillCard } from '@/components/metrics';
@@ -13,9 +13,10 @@ import { SessionTopBar } from '@/components/session/session-top-bar';
 import { TranscriptCard } from '@/components/session/transcript-card';
 import { UnscoredNotice } from '@/components/session/unscored-notice';
 import { WordBreakdown } from '@/components/session/word-breakdown';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
 import { SKILL_ORDER } from '@/constants/metrics';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSessionRecords } from '@/hooks/use-session-history';
 import {
@@ -29,6 +30,12 @@ import { summarizeWords } from '@/services/ai-coaching';
 import type { SkillEstimate, SkillKey } from '@/types/history';
 
 import { useSessionContext } from './_layout';
+
+/** Clears the absolutely-positioned SessionTopBar. */
+const CONTENT_TOP_GAP = 62;
+
+/** Clears the absolutely-positioned ResultsFooter. */
+const FOOTER_SCROLL_INSET = 150;
 
 function dismissToHome() {
   try {
@@ -46,8 +53,7 @@ export default function ResultsScreen() {
   useMarkInteractive(result != null);
 
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const background = palette[scheme].background;
+  const { colors } = useTheme();
   const records = useSessionRecords();
   // recordSession() runs before this screen is pushed, so the store already holds
   // the session being shown. Drop it or "vs your average" would measure this
@@ -136,13 +142,13 @@ export default function ResultsScreen() {
   if (!result) return null;
 
   return (
-    <View style={[styles.screen, { backgroundColor: background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 62,
-          paddingBottom: insets.bottom + 150,
-          paddingHorizontal: 20,
+          paddingTop: insets.top + CONTENT_TOP_GAP,
+          paddingBottom: insets.bottom + FOOTER_SCROLL_INSET,
+          paddingHorizontal: spacing.xl,
         }}>
         {/* The DERIVED score, never the persisted one. A session below the
             scoring floor has no score at all, and `overallScore` would render a
@@ -166,10 +172,10 @@ export default function ResultsScreen() {
           <PlaybackPill result={result} />
         </View>
         <View style={styles.skillsHeader}>
-          <Text style={[styles.sectionTitle, { color: palette[scheme].foreground }]}>Skills</Text>
-          <Text style={[styles.sectionSubtitle, { color: scheme === 'dark' ? '#9E9EA6' : '#77777E' }]}>
+          <ThemedText variant="title">Skills</ThemedText>
+          <ThemedText variant="subhead" weight="regular" tone="secondary">
             How this session compares to your average
-          </Text>
+          </ThemedText>
         </View>
         <SkillCard skills={skills} captions={captions} deltas={deltas} />
         <View style={styles.coaching}>
@@ -185,9 +191,9 @@ export default function ResultsScreen() {
       </ScrollView>
 
       <SessionTopBar onDismiss={handleDone}>
-        <Text style={[styles.title, { color: palette[scheme].foreground }]}>
+        <ThemedText variant="title3" weight="semibold">
           Session Complete
-        </Text>
+        </ThemedText>
       </SessionTopBar>
       <ResultsFooter onRetry={handleRetry} onDone={handleDone} />
     </View>
@@ -198,32 +204,18 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  title: {
-    fontSize: 21,
-    fontFamily: fonts.semibold,
-    letterSpacing: -0.3,
-  },
   playback: {
-    marginTop: 10,
+    marginTop: spacing.md,
   },
   skillsHeader: {
-    marginTop: 26,
-    marginBottom: 12,
-    gap: 4,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
   coaching: {
-    marginTop: 28,
+    marginTop: spacing.xxxl,
   },
   breakdown: {
-    marginTop: 28,
+    marginTop: spacing.xxxl,
   },
 });

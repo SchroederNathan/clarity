@@ -1,9 +1,12 @@
-import { HugeiconsIcon } from '@hugeicons/react-native';
 import { MicOff01Icon } from '@hugeicons-pro/core-stroke-rounded';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
-import { metricColors } from '@/constants/metrics';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+const ICON_TILE_SIZE = 56;
 
 export type UnscoredNoticeProps = {
   title: string;
@@ -19,15 +22,19 @@ export type UnscoredNoticeProps = {
  * keeps the user from thinking their practice time was thrown away.
  */
 export function UnscoredNotice({ title, detail }: UnscoredNoticeProps) {
-  const theme = useColorScheme() === 'dark' ? metricColors.dark : metricColors.light;
+  const { colors } = useTheme();
 
   return (
     <View style={styles.container}>
-      <View style={[styles.iconTile, { backgroundColor: theme.iconTile }]}>
-        <HugeiconsIcon icon={MicOff01Icon} size={26} color={theme.label} strokeWidth={1.5} />
+      <View style={[styles.iconTile, { backgroundColor: colors.fill }]}>
+        <HugeiconsIcon icon={MicOff01Icon} size={26} color={colors.secondary} strokeWidth={1.5} />
       </View>
-      <Text style={[styles.title, { color: theme.ink }]}>{title}</Text>
-      <Text style={[styles.detail, { color: theme.caption }]}>{detail}</Text>
+      <ThemedText variant="title" style={styles.centered}>
+        {title}
+      </ThemedText>
+      <ThemedText variant="subheadProse" tone="tertiary" style={styles.detail}>
+        {detail}
+      </ThemedText>
     </View>
   );
 }
@@ -35,28 +42,22 @@ export function UnscoredNotice({ title, detail }: UnscoredNoticeProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 28,
-    paddingHorizontal: 24,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xxl,
   },
   iconTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: ICON_TILE_SIZE,
+    height: ICON_TILE_SIZE,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
-  title: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
+  centered: {
     textAlign: 'center',
   },
   detail: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
     textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 21,
+    marginTop: spacing.sm,
   },
 });

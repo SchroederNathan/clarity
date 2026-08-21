@@ -1,8 +1,10 @@
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
-import { metricColors, SKILL_ICONS, SKILL_LABELS } from '@/constants/metrics';
+import { ThemedText } from '@/components/ui';
+import { SKILL_ICONS, SKILL_LABELS } from '@/constants/metrics';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { SkillKey } from '@/types/history';
 
 import { DeltaLabel } from './delta-label';
@@ -12,6 +14,9 @@ import { TickBar } from './tick-bar';
 /** Caption line height, held even when a skill has no caption, so every row is
  * the same height and the tick bars below them stay on one grid. */
 const CAPTION_HEIGHT = 16;
+
+/** Skill name line height, so a row's height doesn't depend on its glyphs. */
+const NAME_HEIGHT = 20;
 
 /**
  * One skill: name, raw-measure caption, score out of 100, change, and a tick
@@ -36,8 +41,7 @@ export type SkillRowProps = {
 };
 
 export function SkillRow({ skill, score, caption, delta, focus = false }: SkillRowProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
+  const { colors } = useTheme();
 
   return (
     <View style={styles.row}>
@@ -47,25 +51,34 @@ export function SkillRow({ skill, score, caption, delta, focus = false }: SkillR
           <HugeiconsIcon
             icon={SKILL_ICONS[skill]}
             size={18}
-            color={theme.caption}
+            color={colors.tertiary}
             strokeWidth={1.8}
           />
         </View>
 
         <View style={styles.text}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: theme.ink }]}>{SKILL_LABELS[skill]}</Text>
+            <ThemedText variant="callout" style={styles.name}>
+              {SKILL_LABELS[skill]}
+            </ThemedText>
             {focus && (
-              <View style={[styles.focusPill, { backgroundColor: theme.focusBg }]}>
-                <Text style={[styles.focusLabel, { color: theme.focus }]}>FOCUS</Text>
+              <View style={[styles.focusPill, { backgroundColor: colors.focusBg }]}>
+                <ThemedText variant="micro" weight="bold" tone="focus">
+                  FOCUS
+                </ThemedText>
               </View>
             )}
           </View>
           <View style={styles.captionSlot}>
             {caption != null && (
-              <Text style={[styles.caption, { color: theme.caption }]} numberOfLines={1}>
+              <ThemedText
+                variant="footnote"
+                weight="regular"
+                tone="tertiary"
+                style={styles.caption}
+                numberOfLines={1}>
                 {caption}
-              </Text>
+              </ThemedText>
             )}
           </View>
         </View>
@@ -83,57 +96,48 @@ export function SkillRow({ skill, score, caption, delta, focus = false }: SkillR
 
 const styles = StyleSheet.create({
   row: {
-    gap: 11,
+    gap: spacing.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 9,
+    gap: spacing.sm,
   },
   iconSlot: {
     width: 18,
-    height: 20,
+    height: NAME_HEIGHT,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: spacing.sm,
   },
   name: {
-    fontSize: 16,
-    fontFamily: fonts.semibold,
-    lineHeight: 20,
+    lineHeight: NAME_HEIGHT,
   },
   focusPill: {
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-    borderRadius: 7,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.xs,
     borderCurve: 'continuous',
-  },
-  focusLabel: {
-    fontSize: 10,
-    fontFamily: fonts.bold,
-    letterSpacing: 0.6,
   },
   captionSlot: {
     height: CAPTION_HEIGHT,
     justifyContent: 'center',
   },
   caption: {
-    fontSize: 13,
-    fontFamily: fonts.regular,
     lineHeight: CAPTION_HEIGHT,
   },
   trailing: {
     flexShrink: 0,
     alignItems: 'flex-end',
-    gap: 2,
+    gap: spacing.xxs,
   },
 });

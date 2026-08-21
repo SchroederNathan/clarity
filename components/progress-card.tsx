@@ -1,27 +1,14 @@
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { DeltaLabel, ScoreValue, TickBar } from '@/components/metrics';
-import { fonts } from '@/constants/fonts';
-import { metricColors, type MetricColors } from '@/constants/metrics';
+import { GlassSurface, ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { scoreBand } from '@/lib/score';
 
 /** Ticks in the hero meter. Denser than the skill bars because this one spans
  * the full card width with no trailing score to leave room for. */
 const TICK_COUNT = 35;
-
-const THEME = {
-  light: {
-    badgeBg: '#1C1C21',
-    badgeText: '#FFFFFF',
-    divider: '#E4E4E9',
-  },
-  dark: {
-    badgeBg: '#F2F2F5',
-    badgeText: '#111114',
-    divider: 'rgba(255,255,255,0.12)',
-  },
-} as const;
 
 export type ProgressCardProps = {
   /** Rolling 7-day speaking score; null when the week has nothing measured. */
@@ -34,24 +21,18 @@ export type ProgressCardProps = {
 };
 
 /** One all-time stat: big value plus a muted label beneath. */
-function Stat({
-  value,
-  unit,
-  label,
-  theme,
-}: {
-  value: string;
-  unit: string;
-  label: string;
-  theme: MetricColors;
-}) {
+function Stat({ value, unit, label }: { value: string; unit: string; label: string }) {
   return (
     <View style={styles.stat}>
       <View style={styles.statTop}>
-        <Text style={[styles.statValue, { color: theme.ink }]}>{value}</Text>
-        <Text style={[styles.statUnit, { color: theme.unit }]}>{unit}</Text>
+        <ThemedText variant="title">{value}</ThemedText>
+        <ThemedText variant="footnote" tone="tertiary">
+          {unit}
+        </ThemedText>
       </View>
-      <Text style={[styles.statLabel, { color: theme.unit }]}>{label}</Text>
+      <ThemedText variant="caption" tone="tertiary">
+        {label}
+      </ThemedText>
     </View>
   );
 }
@@ -71,67 +52,53 @@ export function ProgressCard({
   totalSessions,
   longestStreak,
 }: ProgressCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
-  const chrome = THEME[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+  const { colors } = useTheme();
   const hours = totalMinutes >= 60 ? Math.round(totalMinutes / 60) : null;
-
-  const heroBody = (
-    <>
-      <Text style={[styles.eyebrow, { color: theme.label }]}>SPEAKING SCORE</Text>
-      <View style={styles.scoreRow}>
-        <ScoreValue value={score} size={40} maxSize={18} />
-        {score != null && (
-          <View style={[styles.badge, { backgroundColor: chrome.badgeBg }]}>
-            <Text style={[styles.badgeLabel, { color: chrome.badgeText }]}>
-              {scoreBand(score).toUpperCase()}
-            </Text>
-          </View>
-        )}
-      </View>
-      <TickBar fill={score != null ? score / 100 : 0} tickCount={TICK_COUNT} height={20} />
-      <View style={styles.metaRow}>
-        <Text style={[styles.metaLabel, { color: theme.label }]}>Last 7 days</Text>
-        {scoreDelta != null && scoreDelta !== 0 && (
-          <DeltaLabel delta={scoreDelta} suffix="this week" />
-        )}
-      </View>
-    </>
-  );
 
   return (
     <View>
-      {hasGlass ? (
-        <GlassView
-          glassEffectStyle="regular"
-          style={[styles.hero, { backgroundColor: theme.glassTint }]}>
-          {heroBody}
-        </GlassView>
-      ) : (
-        <View style={[styles.hero, { backgroundColor: theme.solidFallback }]}>{heroBody}</View>
-      )}
+      <GlassSurface radius="xl" style={styles.hero}>
+        <ThemedText variant="eyebrow" tone="secondary">
+          SPEAKING SCORE
+        </ThemedText>
+        <View style={styles.scoreRow}>
+          <ScoreValue value={score} size={40} maxSize={18} />
+          {score != null && (
+            <View style={[styles.badge, { backgroundColor: colors.inverseSurface }]}>
+              <ThemedText variant="caption" weight="bold" tone="inverse" style={styles.badgeLabel}>
+                {scoreBand(score).toUpperCase()}
+              </ThemedText>
+            </View>
+          )}
+        </View>
+        <TickBar fill={score != null ? score / 100 : 0} tickCount={TICK_COUNT} height={20} />
+        <View style={styles.metaRow}>
+          <ThemedText variant="footnote" tone="secondary">
+            Last 7 days
+          </ThemedText>
+          {scoreDelta != null && scoreDelta !== 0 && (
+            <DeltaLabel delta={scoreDelta} suffix="this week" />
+          )}
+        </View>
+      </GlassSurface>
 
       <View style={styles.momentum}>
         <Stat
           value={String(hours ?? Math.round(totalMinutes))}
           unit={hours != null ? 'h' : 'min'}
           label="practice"
-          theme={theme}
         />
-        <View style={[styles.momentumDivider, { backgroundColor: chrome.divider }]} />
+        <View style={[styles.momentumDivider, { backgroundColor: colors.divider }]} />
         <Stat
           value={String(totalSessions)}
           unit=""
           label={totalSessions === 1 ? 'session' : 'sessions'}
-          theme={theme}
         />
-        <View style={[styles.momentumDivider, { backgroundColor: chrome.divider }]} />
+        <View style={[styles.momentumDivider, { backgroundColor: colors.divider }]} />
         <Stat
           value={String(longestStreak)}
           unit={longestStreak === 1 ? 'day' : 'days'}
           label="best streak"
-          theme={theme}
         />
       </View>
     </View>
@@ -140,32 +107,22 @@ export function ProgressCard({
 
 const styles = StyleSheet.create({
   hero: {
-    padding: 20,
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    gap: 14,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontFamily: fonts.bold,
-    letterSpacing: 1,
+    padding: spacing.xl,
+    gap: spacing.md,
   },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: -2,
+    // Pulls the score up against the eyebrow's descender space.
+    marginTop: -spacing.xxs,
   },
   badge: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 50,
-    borderCurve: 'continuous',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
   },
   badgeLabel: {
-    fontSize: 12,
-    fontFamily: fonts.bold,
     letterSpacing: 0.5,
   },
   metaRow: {
@@ -173,38 +130,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  metaLabel: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-  },
   momentum: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 2,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.xxs,
   },
   stat: {
     flex: 1,
     alignItems: 'center',
-    gap: 3,
+    gap: spacing.xs,
   },
   statTop: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
-  },
-  statValue: {
-    fontSize: 21,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-  },
-  statUnit: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: fonts.medium,
+    gap: spacing.xs,
   },
   momentumDivider: {
     width: 1,

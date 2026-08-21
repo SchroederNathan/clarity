@@ -1,11 +1,14 @@
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AnimatedRoundedNumber } from '@/components/animated-rounded-number';
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { fonts, spacing, type } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { paceLabel } from '@/lib/metrics';
-import { sessionColors } from '@/constants/session-theme';
 
-const SECONDARY = { light: '#77777E', dark: '#9E9EA6' } as const;
+/** Fixed height for the SwiftUI Host: Hosts don't reliably self-size in a flex
+ * row, so the WPM readout gets a box tall enough for `title3`. */
+const WPM_BOX_HEIGHT = 25;
 
 export type LiveWpmProps = {
   liveWpm: number;
@@ -15,29 +18,26 @@ export type LiveWpmProps = {
 /** Practice header center slot: blue live WPM (SwiftUI numericText transition
  * so digits roll) over a gray "target 179 · good pace" caption. */
 export function LiveWpm({ liveWpm, targetWpm }: LiveWpmProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const accent = sessionColors[scheme].accent;
-  const secondary = SECONDARY[scheme];
+  const { colors } = useTheme();
 
   const wpmText = `${liveWpm > 0 ? liveWpm : '–'} WPM`;
 
   return (
     <View style={styles.wrap}>
-      {/* Fixed-height container: SwiftUI Hosts don't reliably self-size in flex rows. */}
       <View style={styles.wpmBox}>
         <AnimatedRoundedNumber
           text={wpmText}
           value={liveWpm}
-          color={accent}
-          fontSize={20}
+          color={colors.accent}
+          fontSize={type.title3.fontSize}
           fontFamily={fonts.semibold}
           weight="semibold"
           duration={0.5}
         />
       </View>
-      <Text style={[styles.caption, { color: secondary }]}>
+      <ThemedText variant="footnote" tone="secondary">
         {`target ${targetWpm} · ${paceLabel(liveWpm, targetWpm)}`}
-      </Text>
+      </ThemedText>
     </View>
   );
 }
@@ -45,14 +45,10 @@ export function LiveWpm({ liveWpm, targetWpm }: LiveWpmProps) {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    gap: 1,
+    gap: spacing.xxs,
   },
   wpmBox: {
-    height: 25,
+    height: WPM_BOX_HEIGHT,
     justifyContent: 'center',
-  },
-  caption: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
   },
 });

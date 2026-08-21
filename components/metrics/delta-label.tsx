@@ -1,8 +1,8 @@
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { fonts } from '@/constants/fonts';
-import { metricColors } from '@/constants/metrics';
+import { fonts, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * A change since last time: an arrow plus the magnitude.
@@ -45,13 +45,12 @@ export function DeltaLabel({
   hideZero = false,
   color,
 }: DeltaLabelProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
+  const { colors } = useTheme();
 
   if (delta === 0 && hideZero) return null;
 
   const improving = delta > 0;
-  const tone = color ?? (improving ? theme.positive : theme.flat);
+  const tone = color ?? (improving ? colors.positive : colors.tertiary);
 
   return (
     <View style={styles.row}>
@@ -68,7 +67,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: spacing.xs,
   },
   label: {
     fontFamily: fonts.bold,

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Easing, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { AnimatedRoundedNumber } from '@/components/animated-rounded-number';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { metricColors } from '@/constants/metrics';
 import { DeltaLabel } from '@/components/metrics';
+import { ThemedText } from '@/components/ui';
+import { fonts, radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { scoreBand } from '@/lib/score';
 
 import { TickGauge } from './tick-gauge';
@@ -23,10 +23,16 @@ const TICK_WIDTH = 9;
 const FILL_DELAY_MS = 350;
 const FILL_DURATION_MS = 1100;
 
+/** The gauge's own track, heavier than `colors.track`: these ticks are 9pt wide
+ * and 30pt long, so the app-wide 12%/16% track disappears at this scale. */
 const TRACK = {
   light: 'rgba(17,17,20,0.22)',
   dark: 'rgba(255,255,255,0.22)',
 } as const;
+
+/** The results hero number. Sized to the gauge's hollow, not to a ramp step. */
+const SCORE_SIZE = 56;
+const SCORE_BOX_HEIGHT = 64;
 
 export type ScoreGaugeProps = {
   /** 0–100 speaking score for this session. */
@@ -42,9 +48,7 @@ export type ScoreGaugeProps = {
  * here is the number they'll recognize everywhere else.
  */
 export function ScoreGauge({ score, delta }: ScoreGaugeProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const foreground = palette[scheme].foreground;
-  const theme = metricColors[scheme];
+  const { colors, scheme } = useTheme();
 
   const clamped = Math.max(0, Math.min(score, 100));
   const progress = useSharedValue(0);
@@ -73,7 +77,7 @@ export function ScoreGauge({ score, delta }: ScoreGaugeProps) {
       tickLength={TICK_LENGTH}
       tickWidth={TICK_WIDTH}
       progress={progress}
-      fill={foreground}
+      fill={colors.foreground}
       track={TRACK[scheme]}
       style={styles.gauge}>
       {/* Fixed-height boxes: SwiftUI Hosts don't self-size reliably in flex, and
@@ -87,23 +91,27 @@ export function ScoreGauge({ score, delta }: ScoreGaugeProps) {
           <AnimatedRoundedNumber
             text={`${displayScore}`}
             value={displayScore}
-            color={foreground}
-            fontSize={56}
+            color={colors.foreground}
+            fontSize={SCORE_SIZE}
             fontFamily={fonts.heavy}
             weight="heavy"
             duration={0.9}
           />
         </View>
         <View style={styles.maxBox}>
-          <Text style={[styles.max, { color: theme.unit }]}>/100</Text>
+          <ThemedText variant="title3" weight="semibold" tone="tertiary">
+            /100
+          </ThemedText>
         </View>
       </View>
-      <Text style={[styles.band, { color: theme.label }]}>{scoreBand(clamped)}</Text>
+      <ThemedText variant="subhead" tone="secondary" style={styles.band}>
+        {scoreBand(clamped)}
+      </ThemedText>
       {delta != null && delta !== 0 && (
         <View
           style={[
             styles.deltaPill,
-            { backgroundColor: delta > 0 ? theme.positiveBg : 'transparent' },
+            { backgroundColor: delta > 0 ? colors.positiveBg : 'transparent' },
           ]}>
           {/* "vs avg", not "vs your average": the gauge's hollow is only ~150px
               wide at this height, and the longer phrase overflows onto the
@@ -122,32 +130,25 @@ const styles = StyleSheet.create({
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 3,
+    gap: spacing.xs,
   },
   scoreBox: {
-    height: 64,
+    height: SCORE_BOX_HEIGHT,
     justifyContent: 'center',
   },
   maxBox: {
-    height: 64,
+    height: SCORE_BOX_HEIGHT,
     justifyContent: 'flex-end',
     // Lifts "/100" off the box floor onto the 56px digits' baseline.
     paddingBottom: 11,
   },
-  max: {
-    fontSize: 20,
-    fontFamily: fonts.semibold,
-  },
   band: {
-    fontSize: 15,
-    fontFamily: fonts.semibold,
-    marginTop: 2,
+    marginTop: spacing.xxs,
   },
   deltaPill: {
-    marginTop: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 11,
-    borderRadius: 50,
-    borderCurve: 'continuous',
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
   },
 });

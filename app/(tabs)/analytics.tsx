@@ -8,11 +8,12 @@ import {
 } from '@hugeicons-pro/core-stroke-rounded';
 import { GlassContainer } from 'expo-glass-effect';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RecordsCard, type RecordRow } from '@/components/analytics/records-card';
+import { type ScoreChartPoint } from '@/components/analytics/score-chart';
 import { SpeakingScoreCard } from '@/components/analytics/speaking-score-card';
 import { EmptyStateCard } from '@/components/empty-state-card';
 import { useMinimizeOnScroll } from '@/components/glass-tabs';
@@ -20,34 +21,37 @@ import { HeaderActions } from '@/components/header-actions';
 import { CounterCard, SkillCard } from '@/components/metrics';
 import { SegmentedControl } from '@/components/segmented-control';
 import { IntroReveal } from '@/components/splash';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { SectionHeader, ThemedText } from '@/components/ui';
+import { spacing, TAB_BAR_SCROLL_INSET } from '@/constants/theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSessionRecords, useWords } from '@/hooks/use-session-history';
 import { useNow } from '@/hooks/use-now';
 import { useSpeakingSummary } from '@/hooks/use-speaking-summary';
-import { formatDayRange, timeAgo } from '@/lib/format';
+import { formatDayDetail, formatDayRange, formatMonthDay, timeAgo, weekdayInitial } from '@/lib/format';
 import { speakingScore } from '@/lib/score';
-import { bestSession, longestStreakRange, startOfLocalDay, totals } from '@/lib/stats';
+import {
+  bestSession,
+  dayKeyToMs,
+  longestStreakRange,
+  startOfLocalDay,
+  totals,
+  weeklySpeakingScores,
+} from '@/lib/stats';
 
 const MODE_LABELS = { passage: 'Passage', drill: 'Drill', freestyle: 'Freestyle' } as const;
 
 const RANGES = ['Week', 'Month', 'All time'] as const;
 /** Days each range scores over. All time is resolved from the first record. */
 const RANGE_DAYS = [7, 30, null] as const;
-/** Hundreds of daily bars are unreadable, so the all-time chart shows the most
- * recent stretch while the score above it covers everything. The section
- * subtitle says so. */
-const MAX_CHART_DAYS = 30;
+/** What the score delta is measured against, per range. All time has no prior
+ * window by construction, so its delta is always null and needs no suffix. */
+const DELTA_SUFFIXES = ['this week', 'this month', undefined] as const;
 
 export default function AnalyticsScreen() {
   useMarkInteractive();
 
   const onScroll = useMinimizeOnScroll();
   const insets = useSafeAreaInsets();
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? palette.dark : palette.light;
-  const subtitleColor = dark ? '#9E9EA6' : '#77777E';
 
   const [range, setRange] = useState(0);
   const records = useSessionRecords();
@@ -62,8 +66,39 @@ export default function AnalyticsScreen() {
     return Math.max(1, Math.round((startOfLocalDay(now) - first) / 86_400_000) + 1);
   }, [range, records, now]);
 
-  const summary = useSpeakingSummary(windowDays, Math.min(windowDays, MAX_CHART_DAYS));
+  const summary = useSpeakingSummary(windowDays);
   const { mastered } = useWords();
+
+  // What the chart plots. Week and month plot the window's days; all time
+  // plots the WHOLE history as weekly buckets instead of truncating, so the
+  // chart finally covers the same span as the score above it.
+  const chartPoints = useMemo<ScoreChartPoint[]>(() => {
+    if (range === 2) {
+      return weeklySpeakingScores(records, now).map((week, i, all) => ({
+        key: week.startKey,
+        label: formatMonthDay(dayKeyToMs(week.startKey)),
+        detail: formatDayRange(dayKeyToMs(week.startKey), dayKeyToMs(week.endKey)),
+        score: week.score,
+        sessions: week.sessions,
+        minutes: week.minutes,
+        skillCount: week.skillCount,
+        isCurrent: i === all.length - 1,
+      }));
+    }
+    return summary.days.map((day, i, all) => {
+      const ms = dayKeyToMs(day.dayKey);
+      return {
+        key: day.dayKey,
+        label: range === 0 ? weekdayInitial(ms) : formatMonthDay(ms),
+        detail: formatDayDetail(ms),
+        score: day.score,
+        sessions: day.sessions,
+        minutes: day.minutes,
+        skillCount: day.skillCount,
+        isCurrent: i === all.length - 1,
+      };
+    });
+  }, [range, records, now, summary.days]);
 
   // All-time bests. Every value derives from the stored skills, so records
   // written before the score definition changed still rank correctly.
@@ -115,7 +150,7 @@ export default function AnalyticsScreen() {
     <>
       <View style={styles.header}>
         <IntroReveal order={0}>
-          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Analytics</Text>
+          <ThemedText variant="largeTitle">Analytics</ThemedText>
         </IntroReveal>
         <IntroReveal order={0} fade={false}>
           <HeaderActions streak={summary.streak} />
@@ -132,9 +167,9 @@ export default function AnalyticsScreen() {
     scrollEventThrottle: 16,
     style: { flex: 1 },
     contentContainerStyle: {
-      paddingTop: insets.top + 24,
-      paddingHorizontal: 20,
-      paddingBottom: 140,
+      paddingTop: insets.top + spacing.xxl,
+      paddingHorizontal: spacing.xl,
+      paddingBottom: TAB_BAR_SCROLL_INSET,
     },
   } as const;
 
@@ -153,9 +188,6 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const chartTruncated = windowDays > summary.days.length;
-  const rangeLabel = RANGES[range].toLowerCase();
-
   return (
     <Animated.ScrollView {...scroll}>
       {header}
@@ -164,20 +196,14 @@ export default function AnalyticsScreen() {
         <SpeakingScoreCard
           score={summary.score}
           delta={summary.scoreDelta ?? undefined}
-          days={summary.days}
-          chartNote={
-            chartTruncated
-              ? `Score covers all ${windowDays} days; the chart shows the last ${summary.days.length}.`
-              : undefined
-          }
+          deltaSuffix={DELTA_SUFFIXES[range]}
+          points={chartPoints}
+          note={range === 2 ? 'Each bar is one week.' : undefined}
         />
       </IntroReveal>
 
       <IntroReveal order={3}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Skills</Text>
-        <Text style={[styles.sectionSubtitle, { color: subtitleColor }]}>
-          How each part of your speaking is trending
-        </Text>
+        <SectionHeader title="Skills" subtitle="How each part of your speaking is trending" />
       </IntroReveal>
       <IntroReveal order={4} fade={false} style={styles.sectionCard}>
         <SkillCard
@@ -188,20 +214,20 @@ export default function AnalyticsScreen() {
       </IntroReveal>
 
       <IntroReveal order={5}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          {range === 0 ? 'This week' : range === 1 ? 'This month' : 'All time'}
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: subtitleColor }]}>
-          {range === 2
-            ? `Your effort across ${windowDays} days of practice`
-            : `Your effort over the last ${windowDays} days`}
-        </Text>
+        <SectionHeader
+          title={range === 0 ? 'This week' : range === 1 ? 'This month' : 'All time'}
+          subtitle={
+            range === 2
+              ? `Your effort across ${windowDays} days of practice`
+              : `Your effort over the last ${windowDays} days`
+          }
+        />
       </IntroReveal>
       <IntroReveal order={6} fade={false} style={styles.sectionCard}>
         {/* Three counters, so the second row carries one full-width card rather
             than a half-width card beside a gap. GlassContainer groups all three
             so their glass composites as one set; `spacing` is left unset on
-            purpose — raising it past the 10px gaps would fuse the cards into a
+            purpose — raising it past the grid's gaps would fuse the cards into a
             single blob instead of keeping them a legible grid. */}
         <GlassContainer style={styles.counterGroup}>
           <View style={styles.counterRow}>
@@ -245,10 +271,7 @@ export default function AnalyticsScreen() {
       {recordRows.length > 0 && (
         <>
           <IntroReveal order={7}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Records</Text>
-            <Text style={[styles.sectionSubtitle, { color: subtitleColor }]}>
-              Your all-time bests
-            </Text>
+            <SectionHeader title="Records" subtitle="Your all-time bests" />
           </IntroReveal>
           <IntroReveal order={8} fade={false} style={styles.sectionCard}>
             <RecordsCard rows={recordRows} />
@@ -265,34 +288,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  screenTitle: {
-    fontSize: 34,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.5,
-  },
   control: {
-    marginTop: 18,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-    marginTop: 28,
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: spacing.xl,
   },
   sectionCard: {
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   counterGroup: {
-    gap: 10,
+    gap: spacing.md,
   },
   counterRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.md,
   },
 });

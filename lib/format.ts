@@ -11,15 +11,29 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ] as const;
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+
 function monthDay(ms: number): string {
   const d = new Date(ms);
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
-/** Short absolute day, e.g. "Aug 20". Used where a relative label would be
- * vaguer than the real date, like a subscription renewal. */
+/** Compact "Aug 3" label, e.g. a chart axis tick or a subscription renewal,
+ * where a relative label would be vaguer than the real date. */
 export function formatMonthDay(ms: number): string {
   return monthDay(ms);
+}
+
+/** Single-letter weekday, e.g. the labels under a week of chart bars. */
+export function weekdayInitial(ms: number): string {
+  return WEEKDAY_INITIALS[new Date(ms).getDay()];
+}
+
+/** Full day label for a detail surface, e.g. "Wed, Aug 19". */
+export function formatDayDetail(ms: number): string {
+  return `${WEEKDAYS[new Date(ms).getDay()]}, ${monthDay(ms)}`;
 }
 
 /** Inclusive day span, e.g. "Feb 2 – Feb 15", collapsing to "Feb 2" when the

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LiveWpm } from '@/components/session/live-wpm';
@@ -11,14 +11,11 @@ import {
   Teleprompter,
   type TeleprompterColors,
 } from '@/components/session/teleprompter';
-import { palette } from '@/constants/colors';
 import { PASSAGES } from '@/constants/passages';
-import {
-  sessionColors,
-  TELEPROMPTER_TEXT_SIZES,
-} from '@/constants/session-theme';
+import { TELEPROMPTER_TEXT_SIZES } from '@/constants/session-theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { usePracticeSession } from '@/hooks/use-practice-session';
+import { useTheme } from '@/hooks/use-theme';
 import { useSessionCheckpoint } from '@/hooks/use-session-checkpoint';
 import { getAnyPassage, modeForId } from '@/lib/passage-catalog';
 import { tokenizePassage } from '@/lib/passage-text';
@@ -35,6 +32,9 @@ function dismissToHome() {
   }
 }
 
+/** Clears the absolutely-positioned SessionTopBar, plus breathing room. */
+const CONTENT_TOP_GAP = 82;
+
 export default function PracticeScreen() {
   const { passageId } = useLocalSearchParams<{ passageId: string }>();
   const found = getAnyPassage(passageId);
@@ -46,9 +46,7 @@ export default function PracticeScreen() {
   // counts as this route being interactive.
   useMarkInteractive(Boolean(found));
 
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const screenPalette = palette[scheme];
+  const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { setResult, retryToken } = useSessionContext();
@@ -223,20 +221,20 @@ export default function PracticeScreen() {
 
   const teleColors: TeleprompterColors = useMemo(
     () => ({
-      foreground: screenPalette.foreground,
+      foreground: colors.foreground,
       dimmed: colors.dimmed,
       accent: colors.accent,
       accentFaded: colors.accentFaded,
     }),
-    [screenPalette, colors],
+    [colors],
   );
 
   if (!found) return null;
 
-  const contentTop = insets.top + 82;
+  const contentTop = insets.top + CONTENT_TOP_GAP;
 
   return (
-    <View style={[styles.screen, { backgroundColor: screenPalette.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Teleprompter
         tokenized={tokenized}
         currentWordIndex={session.currentWordIndex}

@@ -2,34 +2,32 @@ import { Refresh01Icon } from '@hugeicons-pro/core-stroke-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { LoadingSpinner } from '@/components/loading-spinner';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { sessionColors } from '@/constants/session-theme';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
 import { useAiCoaching } from '@/hooks/use-ai-coaching';
+import { useTheme } from '@/hooks/use-theme';
 import type { SessionResult } from '@/types/session';
 
-const SECONDARY = { light: '#77777E', dark: '#A7A7AE' } as const;
-const ICON_BACKGROUND = {
-  light: 'rgba(52,120,246,0.12)',
-  dark: 'rgba(76,141,255,0.18)',
-} as const;
-const DIVIDER = {
-  light: 'rgba(17,17,20,0.09)',
-  dark: 'rgba(255,255,255,0.11)',
-} as const;
+/** Card floor, so a one-line summary and the loading row occupy the same space
+ * and the surrounding layout doesn't jump when coaching arrives. */
+const CARD_MIN_HEIGHT = 104;
+const LOADING_ROW_MIN_HEIGHT = 68;
+
+/** The numbered tip badge. Square with a soft corner, not a circle: a two-digit
+ * tip number would crowd a circle of this size. */
+const TIP_BADGE_SIZE = 28;
+
+const RETRY_HEIGHT = 38;
 
 export type AiCoachingCardProps = {
   result: SessionResult;
 };
 
 export function AiCoachingCard({ result }: AiCoachingCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const foreground = palette[scheme].foreground;
-  const secondary = SECONDARY[scheme];
+  const { colors } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
   const coaching = useAiCoaching(result);
 
@@ -44,34 +42,32 @@ export function AiCoachingCard({ result }: AiCoachingCardProps) {
 
   // Streaming partials and the final result render through the same view.
   const breakdown =
-    coaching.status === 'streaming' || coaching.status === 'success'
-      ? coaching.breakdown
-      : null;
+    coaching.status === 'streaming' || coaching.status === 'success' ? coaching.breakdown : null;
   const tips = (breakdown?.tips ?? []).filter(
     (tip): tip is NonNullable<typeof tip> => !!tip?.title,
   );
 
   return (
     <View>
-      <Text style={[styles.heading, { color: foreground }]}>AI Coach</Text>
+      <ThemedText variant="title3" weight="bold" style={styles.heading}>
+        AI Coach
+      </ThemedText>
 
       <View style={styles.card}>
+        {/* The card's glass is an absolute sibling so the retry button's tinted
+            bed is never nested inside a glass effect. */}
         {hasGlass ? (
           <GlassView
             glassEffectStyle="regular"
             style={[
               StyleSheet.absoluteFill,
               styles.cardShape,
-              { backgroundColor: colors.controlCard },
+              { backgroundColor: colors.glassTintStrong },
             ]}
           />
         ) : (
           <View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.cardShape,
-              { backgroundColor: colors.controlCardSolid },
-            ]}
+            style={[StyleSheet.absoluteFill, styles.cardShape, { backgroundColor: colors.card }]}
           />
         )}
 
@@ -79,36 +75,47 @@ export function AiCoachingCard({ result }: AiCoachingCardProps) {
           <View style={styles.state}>
             <LoadingSpinner active={isLoading} onFinish={() => setSpinnerDone(true)} />
             <View style={styles.stateCopy}>
-              <Text style={[styles.stateTitle, { color: foreground }]}>Reviewing your session</Text>
-              <Text style={[styles.stateBody, { color: secondary }]}>
+              <ThemedText variant="callout">Reviewing your session</ThemedText>
+              <ThemedText variant="footnoteProse" tone="secondary">
                 Putting together a few pointers for you.
-              </Text>
+              </ThemedText>
             </View>
           </View>
         ) : null}
 
         {!showLoading && coaching.status === 'error' ? (
           <View style={styles.errorState}>
-            <Text style={[styles.stateTitle, { color: foreground }]}>Coaching couldn’t load</Text>
-            <Text style={[styles.stateBody, { color: secondary }]}>{coaching.error}</Text>
+            <ThemedText variant="callout">Coaching couldn’t load</ThemedText>
+            <ThemedText variant="footnoteProse" tone="secondary">
+              {coaching.error}
+            </ThemedText>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Retry AI coaching"
               onPress={coaching.retry}
               style={({ pressed }) => [
                 styles.retryButton,
-                { backgroundColor: ICON_BACKGROUND[scheme] },
+                { backgroundColor: colors.accentBg },
                 pressed && styles.pressed,
               ]}>
-              <HugeiconsIcon icon={Refresh01Icon} size={17} color={colors.accent} strokeWidth={1.8} />
-              <Text style={[styles.retryLabel, { color: colors.accent }]}>Try again</Text>
+              <HugeiconsIcon
+                icon={Refresh01Icon}
+                size={17}
+                color={colors.accent}
+                strokeWidth={1.8}
+              />
+              <ThemedText variant="footnote" weight="semibold" tone="accent">
+                Try again
+              </ThemedText>
             </Pressable>
           </View>
         ) : null}
 
         {!showLoading && breakdown ? (
           <View>
-            <Text style={[styles.summary, { color: foreground }]}>{breakdown.summary ?? ''}</Text>
+            <ThemedText variant="bodyProse" weight="semibold" style={styles.summary}>
+              {breakdown.summary ?? ''}
+            </ThemedText>
             {tips.length > 0 ? (
               <View style={styles.tips}>
                 {tips.map((tip, index) => (
@@ -116,20 +123,26 @@ export function AiCoachingCard({ result }: AiCoachingCardProps) {
                     key={index}
                     style={[
                       styles.tip,
-                      index > 0 && { borderTopColor: DIVIDER[scheme], borderTopWidth: 1 },
+                      index > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 },
                     ]}>
-                    <View style={[styles.tipNumber, { backgroundColor: ICON_BACKGROUND[scheme] }]}>
-                      <Text style={[styles.tipNumberText, { color: colors.accent }]}>{index + 1}</Text>
+                    <View style={[styles.tipNumber, { backgroundColor: colors.accentBg }]}>
+                      <ThemedText variant="footnote" weight="bold" tone="accent">
+                        {index + 1}
+                      </ThemedText>
                     </View>
                     <View style={styles.tipCopy}>
-                      <Text style={[styles.tipTitle, { color: foreground }]}>{tip.title}</Text>
+                      <ThemedText variant="callout" style={styles.tipTitle}>
+                        {tip.title}
+                      </ThemedText>
                       {tip.guidance ? (
-                        <Text style={[styles.tipGuidance, { color: foreground }]}>
+                        <ThemedText variant="subheadProse" style={styles.tipGuidance}>
                           {tip.guidance}
-                        </Text>
+                        </ThemedText>
                       ) : null}
                       {tip.evidence ? (
-                        <Text style={[styles.evidence, { color: secondary }]}>{tip.evidence}</Text>
+                        <ThemedText variant="caption" tone="secondary" style={styles.evidence}>
+                          {tip.evidence}
+                        </ThemedText>
                       ) : null}
                     </View>
                   </View>
@@ -145,106 +158,77 @@ export function AiCoachingCard({ result }: AiCoachingCardProps) {
 
 const styles = StyleSheet.create({
   heading: {
-    fontSize: 20,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   card: {
-    minHeight: 104,
-    borderRadius: 28,
+    minHeight: CARD_MIN_HEIGHT,
+    borderRadius: radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',
-    padding: 18,
+    padding: spacing.xl,
   },
   cardShape: {
-    borderRadius: 28,
+    borderRadius: radius.lg,
     borderCurve: 'continuous',
   },
   state: {
-    minHeight: 68,
+    minHeight: LOADING_ROW_MIN_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: spacing.lg,
   },
   stateCopy: {
     flex: 1,
-    gap: 3,
-  },
-  stateTitle: {
-    fontSize: 16,
-    fontFamily: fonts.semibold,
-  },
-  stateBody: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: fonts.regular,
+    gap: spacing.xs,
   },
   errorState: {
-    gap: 7,
+    gap: spacing.sm,
     alignItems: 'flex-start',
   },
   retryButton: {
-    height: 38,
-    borderRadius: 19,
-    marginTop: 5,
-    paddingHorizontal: 14,
+    height: RETRY_HEIGHT,
+    borderRadius: radius.full,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-  },
-  retryLabel: {
-    fontSize: 14,
-    fontFamily: fonts.semibold,
+    gap: spacing.sm,
   },
   pressed: {
     opacity: 0.72,
   },
   summary: {
-    fontSize: 17,
-    lineHeight: 23,
-    fontFamily: fonts.semibold,
     letterSpacing: -0.15,
   },
   tips: {
-    marginTop: 10,
+    marginTop: spacing.md,
   },
   tip: {
     flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 14,
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
   },
   tipNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: TIP_BADGE_SIZE,
+    height: TIP_BADGE_SIZE,
+    borderRadius: radius.sm,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
+    // Sits the badge on the tip title's cap height rather than its line box.
     marginTop: 1,
-  },
-  tipNumberText: {
-    fontSize: 13,
-    fontFamily: fonts.bold,
   },
   tipCopy: {
     flex: 1,
   },
   tipTitle: {
-    fontSize: 16,
     lineHeight: 20,
-    fontFamily: fonts.semibold,
   },
   tipGuidance: {
-    marginTop: 4,
-    fontSize: 15,
-    lineHeight: 21,
-    fontFamily: fonts.regular,
+    marginTop: spacing.xs,
   },
   evidence: {
-    marginTop: 6,
-    fontSize: 12,
+    marginTop: spacing.sm,
     lineHeight: 16,
-    fontFamily: fonts.medium,
   },
 });

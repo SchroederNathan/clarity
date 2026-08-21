@@ -3,13 +3,13 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { Alert, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import RevenueCatUI from 'react-native-purchases-ui';
 
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { fonts } from '@/constants/theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useTheme } from '@/hooks/use-theme';
 import { isPro } from '@/lib/entitlements';
 import { describePurchasesError } from '@/services/purchases';
 
@@ -21,8 +21,7 @@ const PRO_GOLD = '#FFB000';
  * cause so the next person is not guessing.
  */
 function PurchasesUnavailable({ onClose }: { onClose: () => void }) {
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? palette.dark : palette.light;
+  const { colors } = useTheme();
 
   return (
     <View style={[styles.unavailable, { backgroundColor: colors.background }]}>
@@ -32,7 +31,7 @@ function PurchasesUnavailable({ onClose }: { onClose: () => void }) {
       <Text style={[styles.unavailableTitle, { color: colors.foreground }]}>
         Clarity Pro is unavailable
       </Text>
-      <Text style={[styles.unavailableBody, { color: dark ? '#9E9EA6' : '#77777E' }]}>
+      <Text style={[styles.unavailableBody, { color: colors.secondary }]}>
         This build has no store connected, so plans cannot load. Try the app on a device or
         simulator build.
       </Text>

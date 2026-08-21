@@ -1,57 +1,48 @@
 import { PlayIcon, VolumeHighIcon } from '@hugeicons-pro/core-solid-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { Fragment } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
+import { GlassSurface, ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-const THEME = {
-  light: {
-    glassTint: 'rgba(255,255,255,0.45)',
-    solidFallback: 'rgba(255,255,255,0.96)',
-    foreground: '#111114',
-    secondary: '#77777E',
-    chipBg: '#F3F3F5',
-    chipText: '#8A8A90',
-    speakerBg: '#F1F1F4',
-    speakerIcon: '#33333A',
-    divider: 'rgba(17,17,20,0.06)',
-    badgeBg: '#1C1C21',
-    badgeText: '#FFFFFF',
-  },
-  dark: {
-    glassTint: 'rgba(10,10,12,0.55)',
-    solidFallback: 'rgba(26,26,30,0.96)',
-    foreground: '#FFFFFF',
-    secondary: '#9E9EA6',
-    chipBg: 'rgba(255,255,255,0.08)',
-    chipText: '#9E9EA6',
-    speakerBg: 'rgba(255,255,255,0.08)',
-    speakerIcon: '#D8D8DE',
-    divider: 'rgba(255,255,255,0.06)',
-    badgeBg: '#F2F2F5',
-    badgeText: '#111114',
-  },
-} as const;
+/** Row inset. Wider on the left than the card's own padding so the word column
+ * lines up with the header summary above it. */
+const ROW_INSET = spacing.xl;
+
+/** Speaker button. 36pt of glyph inside a 44pt hit area via `hitSlop`. */
+const SPEAKER_SIZE = 36;
+
+/** Glyph size in the "Practice all" pill; the loading spinner is boxed to the
+ * same footprint so the pill doesn't change height while generating. */
+const PILL_ICON_SIZE = 13;
 
 export type WordToMaster = { word: string; count: number };
 
 export type WordsToMasterProps = {
   words: readonly WordToMaster[];
   onPracticeAll: () => void;
-  /** Play the word's pronunciation (TTS not wired yet — haptic-only for now). */
+  /** True while the practice passage is being generated; shows a spinner in the pill. */
+  generating?: boolean;
+  /** Play the word's pronunciation. */
   onSpeak?: (word: string) => void;
+  /** The word whose clip is currently loading; its speaker shows a spinner. */
+  speakingWord?: string | null;
 };
 
 /** "Words to master" body: a frosted card whose header pairs a count summary
  * with a "Practice all" pill, over one row per trouble word (frequency chip +
  * a tap-to-hear speaker). */
-export function WordsToMaster({ words, onPracticeAll, onSpeak }: WordsToMasterProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+export function WordsToMaster({
+  words,
+  onPracticeAll,
+  generating = false,
+  onSpeak,
+  speakingWord,
+}: WordsToMasterProps) {
+  const { colors } = useTheme();
 
   const handlePracticeAll = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -63,134 +54,143 @@ export function WordsToMaster({ words, onPracticeAll, onSpeak }: WordsToMasterPr
     onSpeak?.(word);
   };
 
-  const body = (
-    <>
+  return (
+    <GlassSurface radius="lg" style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.summary, { color: theme.secondary }]}>
+        <ThemedText variant="subhead" tone="secondary">
           {words.length} {words.length === 1 ? 'word needs' : 'words need'} work
-        </Text>
+        </ThemedText>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ busy: generating }}
+          disabled={generating}
           onPress={handlePracticeAll}
           style={({ pressed }) => [
             styles.practiceAll,
-            { backgroundColor: theme.badgeBg },
-            pressed && { opacity: 0.85 },
+            { backgroundColor: colors.inverseSurface },
+            pressed && styles.pressed,
           ]}>
-          <HugeiconsIcon icon={PlayIcon} size={13} color={theme.badgeText} />
-          <Text style={[styles.practiceAllLabel, { color: theme.badgeText }]}>Practice all</Text>
+          {generating ? (
+            <View style={styles.pillSpinner}>
+              <ActivityIndicator size="small" color={colors.inverseLabel} style={styles.pillSpinnerScale} />
+            </View>
+          ) : (
+            <HugeiconsIcon icon={PlayIcon} size={PILL_ICON_SIZE} color={colors.inverseLabel} />
+          )}
+          <ThemedText variant="subhead" tone="inverse">
+            {generating ? 'Creating passage' : 'Practice all'}
+          </ThemedText>
         </Pressable>
       </View>
 
       {words.map((item, i) => (
         <Fragment key={item.word}>
-          {i > 0 && <View style={[styles.divider, { backgroundColor: theme.divider }]} />}
+          {i > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
           <View style={styles.row}>
             <View style={styles.wordGroup}>
-              <Text style={[styles.word, { color: theme.foreground }]} numberOfLines={1}>
+              <ThemedText variant="callout" style={styles.word} numberOfLines={1}>
                 {item.word}
-              </Text>
-              <View style={[styles.chip, { backgroundColor: theme.chipBg }]}>
-                <Text style={[styles.chipLabel, { color: theme.chipText }]}>{item.count}×</Text>
+              </ThemedText>
+              <View style={[styles.chip, { backgroundColor: colors.fill }]}>
+                <ThemedText variant="caption" weight="semibold" tone="tertiary">
+                  {item.count}×
+                </ThemedText>
               </View>
             </View>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Hear ${item.word}`}
+              accessibilityState={{ busy: speakingWord === item.word }}
+              disabled={speakingWord === item.word}
               onPress={() => handleSpeak(item.word)}
-              hitSlop={8}
+              hitSlop={spacing.sm}
               style={({ pressed }) => [
                 styles.speaker,
-                { backgroundColor: theme.speakerBg },
-                pressed && { opacity: 0.6 },
+                { backgroundColor: colors.fill },
+                pressed && styles.pressedStrong,
               ]}>
-              <HugeiconsIcon icon={VolumeHighIcon} size={19} color={theme.speakerIcon} />
+              {speakingWord === item.word ? (
+                <ActivityIndicator size="small" color={colors.foreground} />
+              ) : (
+                <HugeiconsIcon icon={VolumeHighIcon} size={19} color={colors.foreground} />
+              )}
             </Pressable>
           </View>
         </Fragment>
       ))}
-    </>
-  );
-
-  return hasGlass ? (
-    <GlassView glassEffectStyle="regular" style={[styles.card, { backgroundColor: theme.glassTint }]}>
-      {body}
-    </GlassView>
-  ) : (
-    <View style={[styles.card, { backgroundColor: theme.solidFallback }]}>{body}</View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    paddingVertical: 6,
+    paddingVertical: spacing.sm,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 18,
-    paddingRight: 12,
-    paddingTop: 12,
-    paddingBottom: 10,
-  },
-  summary: {
-    fontSize: 15,
-    fontFamily: fonts.semibold,
+    paddingLeft: ROW_INSET,
+    paddingRight: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   practiceAll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 50,
-    borderCurve: 'continuous',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
   },
-  practiceAllLabel: {
-    fontSize: 14,
-    fontFamily: fonts.semibold,
+  pillSpinner: {
+    width: PILL_ICON_SIZE,
+    height: PILL_ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The "small" indicator is 20pt; shrink it into the icon's 13pt footprint.
+  pillSpinnerScale: {
+    transform: [{ scale: PILL_ICON_SIZE / 20 }],
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 18,
-    paddingRight: 12,
-    paddingVertical: 10,
+    paddingLeft: ROW_INSET,
+    paddingRight: spacing.md,
+    paddingVertical: spacing.md,
   },
   wordGroup: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.md,
   },
   word: {
-    fontSize: 16,
-    fontFamily: fonts.semibold,
-    letterSpacing: -0.2,
     flexShrink: 1,
   },
   chip: {
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-    borderRadius: 6,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.xs,
     borderCurve: 'continuous',
-  },
-  chipLabel: {
-    fontSize: 12,
-    fontFamily: fonts.semibold,
   },
   speaker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderCurve: 'continuous',
+    width: SPEAKER_SIZE,
+    height: SPEAKER_SIZE,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginLeft: 18,
+    marginLeft: ROW_INSET,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  pressedStrong: {
+    opacity: 0.6,
   },
 });

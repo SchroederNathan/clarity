@@ -1,23 +1,15 @@
 import { Book02Icon } from '@hugeicons-pro/core-solid-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { router, Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { SegmentedControl } from '@/components/segmented-control';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { PrimaryButton, ThemedText } from '@/components/ui';
+import { radius, spacing, type } from '@/constants/theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
+import { useTheme } from '@/hooks/use-theme';
 import { tokenizePassage } from '@/lib/passage-text';
 import { addPassage } from '@/services/user-passages';
 
@@ -29,35 +21,14 @@ const PACE_OPTIONS = [
   { label: 'Brisk', wpm: 175 },
 ] as const;
 
-/** Button treatment matching DailyGoalCard's Start Practicing CTA. */
-const THEME = {
-  light: {
-    secondary: '#77777E',
-    divider: 'rgba(17,17,20,0.10)',
-    buttonTint: '#1C1C21',
-    buttonSolid: '#1C1C21',
-    buttonLabel: '#FFFFFF',
-    buttonDisabled: 'rgba(17,17,20,0.18)',
-    buttonDisabledLabel: 'rgba(255,255,255,0.85)',
-    error: '#FF3B30',
-  },
-  dark: {
-    secondary: '#9E9EA6',
-    divider: 'rgba(255,255,255,0.12)',
-    buttonTint: '#F2F2F5',
-    buttonSolid: '#F2F2F5',
-    buttonLabel: '#111114',
-    buttonDisabled: 'rgba(255,255,255,0.14)',
-    buttonDisabledLabel: 'rgba(17,17,20,0.6)',
-    error: '#FF453A',
-  },
-} as const;
+/** Fixed-size box the native toolbar needs around its one child. */
+const TOOLBAR_TITLE_WIDTH = 200;
+const TOOLBAR_TITLE_HEIGHT = 36;
 
 /** Flat card surface — glass is reserved for the save CTA, matching how the
  * rest of the app keeps solid cards for content and glass for chrome. */
 function EditorCard({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = palette[scheme];
+  const { colors } = useTheme();
 
   return <View style={[styles.card, { backgroundColor: colors.card }]}>{children}</View>;
 }
@@ -67,10 +38,7 @@ function EditorCard({ children }: { children: React.ReactNode }) {
 export default function PassageEditorScreen() {
   useMarkInteractive();
 
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = palette[scheme];
-  const theme = THEME[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+  const { colors } = useTheme();
 
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -112,23 +80,6 @@ export default function PassageEditorScreen() {
         ? `${wordCount} of ${MIN_WORDS} words needed`
         : `${wordCount} words · ~${minutes} min${minutes > 1 ? 's' : ''} at ${targetWpm} wpm`;
 
-  const buttonContent = (
-    <>
-      <HugeiconsIcon
-        icon={Book02Icon}
-        size={22}
-        color={canSave ? theme.buttonLabel : theme.buttonDisabledLabel}
-      />
-      <Text
-        style={[
-          styles.saveLabel,
-          { color: canSave ? theme.buttonLabel : theme.buttonDisabledLabel },
-        ]}>
-        Save to Library
-      </Text>
-    </>
-  );
-
   return (
     <>
       <ScrollView
@@ -139,7 +90,9 @@ export default function PassageEditorScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <EditorCard>
-          <Text style={[styles.caption, { color: theme.secondary }]}>Title</Text>
+          <ThemedText variant="footnote" tone="secondary" style={styles.caption}>
+            Title
+          </ThemedText>
           <TextInput
             value={title}
             onChangeText={(v) => {
@@ -147,14 +100,16 @@ export default function PassageEditorScreen() {
               setSaveError(null);
             }}
             placeholder="My speech"
-            placeholderTextColor={theme.secondary}
+            placeholderTextColor={colors.secondary}
             maxLength={48}
             style={[styles.titleInput, { color: colors.foreground }]}
           />
         </EditorCard>
 
         <EditorCard>
-          <Text style={[styles.caption, { color: theme.secondary }]}>Your words</Text>
+          <ThemedText variant="footnote" tone="secondary" style={styles.caption}>
+            Your words
+          </ThemedText>
           <TextInput
             value={text}
             onChangeText={(v) => {
@@ -162,19 +117,23 @@ export default function PassageEditorScreen() {
               setSaveError(null);
             }}
             placeholder="Paste any text, speech, or transcript…"
-            placeholderTextColor={theme.secondary}
+            placeholderTextColor={colors.secondary}
             multiline
             textAlignVertical="top"
             style={[styles.textInput, { color: colors.foreground }]}
           />
-          <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          <Text style={[styles.meta, { color: saveError ? theme.error : theme.secondary }]}>
+          <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          <ThemedText
+            variant="footnote"
+            style={[styles.meta, { color: saveError ? colors.danger : colors.secondary }]}>
             {saveError ?? preview}
-          </Text>
+          </ThemedText>
         </EditorCard>
 
         <EditorCard>
-          <Text style={[styles.caption, { color: theme.secondary }]}>Reading pace</Text>
+          <ThemedText variant="footnote" tone="secondary" style={styles.caption}>
+            Reading pace
+          </ThemedText>
           {/* Matches the caption→input visual gap: the text inputs add ~4pt
               of their own leading below the caption's 6pt margin. */}
           <SegmentedControl
@@ -188,28 +147,13 @@ export default function PassageEditorScreen() {
           />
         </EditorCard>
 
-        <Pressable
+        <PrimaryButton
+          title="Save to Library"
+          icon={Book02Icon}
           onPress={handleSave}
           disabled={!canSave}
-          style={({ pressed }) => pressed && { opacity: 0.85 }}>
-          {hasGlass && canSave ? (
-            <GlassView
-              glassEffectStyle="regular"
-              isInteractive
-              tintColor={theme.buttonTint}
-              style={styles.save}>
-              {buttonContent}
-            </GlassView>
-          ) : (
-            <View
-              style={[
-                styles.save,
-                { backgroundColor: canSave ? theme.buttonSolid : theme.buttonDisabled },
-              ]}>
-              {buttonContent}
-            </View>
-          )}
-        </Pressable>
+          style={styles.save}
+        />
       </ScrollView>
 
       {/* Custom title on the LEFT of the header bar (iOS centers regular
@@ -218,9 +162,9 @@ export default function PassageEditorScreen() {
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.View hidesSharedBackground>
           <View style={styles.headerTitleBox}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+            <ThemedText variant="title3" weight="semibold">
               New Passage
-            </Text>
+            </ThemedText>
           </View>
         </Stack.Toolbar.View>
       </Stack.Toolbar>
@@ -235,69 +179,48 @@ const styles = StyleSheet.create({
   // Toolbar views need one child with explicit width/height; centering
   // vertically inside it keeps the text on the bar's middle line.
   headerTitleBox: {
-    width: 200,
-    height: 36,
+    width: TOOLBAR_TITLE_WIDTH,
+    height: TOOLBAR_TITLE_HEIGHT,
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 21,
-    fontFamily: fonts.semibold,
-    letterSpacing: -0.3,
-  },
   content: {
-    padding: 20,
-    paddingBottom: 48,
-    gap: 14,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxxl,
+    gap: spacing.lg,
   },
   card: {
-    padding: 18,
-    borderRadius: 26,
+    padding: spacing.xl,
+    borderRadius: radius.lg,
     borderCurve: 'continuous',
   },
   caption: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    marginBottom: 6,
+    marginBottom: spacing.sm,
   },
   paceControl: {
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
+  // The inputs mirror the ramp steps their content reads as — a passage title is
+  // a `title3`, its body is `bodyProse` — with the vertical padding trimmed so
+  // the caret sits tight under the caption.
   titleInput: {
-    fontSize: 20,
-    fontFamily: fonts.semibold,
-    letterSpacing: -0.3,
-    paddingVertical: 2,
+    ...type.title3,
+    paddingVertical: spacing.xxs,
   },
   textInput: {
-    fontSize: 17,
-    fontFamily: fonts.regular,
-    lineHeight: 24,
+    ...type.bodyProse,
     minHeight: 150,
     maxHeight: 260,
-    paddingTop: 2,
+    paddingTop: spacing.xxs,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginTop: 12,
-    marginBottom: 10,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
   },
   meta: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
     fontVariant: ['tabular-nums'],
   },
   save: {
-    height: 60,
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 6,
-  },
-  saveLabel: {
-    fontSize: 18,
-    fontFamily: fonts.semibold,
+    marginTop: spacing.sm,
   },
 });

@@ -20,10 +20,16 @@ import Animated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 
-import { fonts } from '@/constants/fonts';
+import { fonts } from '@/constants/theme';
 import { sentenceAt, type TokenizedPassage } from '@/lib/passage-text';
 
 const LINE_HEIGHT_FACTOR = 1.32;
+
+/** Reading-text edge padding. Wider than the app's `spacing.lg` screen padding:
+ * a full-width line of 34pt text is hard to track back to the next line.
+ * Not read from the token scale because a local `spacing` (derived from the
+ * user's chosen text size) shadows it in this file. */
+const CONTENT_PADDING = 24;
 /** The active line is auto-scrolled to sit at this fraction of the viewport. */
 const SCROLL_ANCHOR = 0.42;
 
@@ -280,7 +286,7 @@ export const Teleprompter = memo(function Teleprompter({
       contentContainerStyle={{
         paddingTop: topInset,
         paddingBottom: bottomInset,
-        paddingHorizontal: 24,
+        paddingHorizontal: CONTENT_PADDING,
       }}>
       {tokenized.paragraphs.map((p, i) =>
         i === activeParagraphIndex ? (

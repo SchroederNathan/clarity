@@ -9,7 +9,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { fonts } from '@/constants/fonts';
+import { fonts, radius, spacing, type } from '@/constants/theme';
 import { formatClock } from '@/lib/metrics';
 
 const BAR_COUNT = 26;
@@ -17,6 +17,11 @@ const HALF = BAR_COUNT / 2;
 const SAMPLE_MS = 90;
 const MIN_HEIGHT = 7;
 const MAX_HEIGHT = 30;
+const BAR_WIDTH = 3.5;
+
+/** Holds the timer's width across every clock value so the bars either side of
+ * it don't shift as the digits change. */
+const TIMER_MIN_WIDTH = 56;
 
 const Bar = memo(function Bar({
   samples,
@@ -98,15 +103,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
   },
   bar: {
-    width: 3.5,
-    borderRadius: 2,
+    width: BAR_WIDTH,
+    borderRadius: radius.xs,
   },
   timer: {
-    fontSize: 22,
+    ...type.title,
     fontFamily: fonts.semibold,
     fontVariant: ['tabular-nums'],
-    marginHorizontal: 14,
-    minWidth: 56,
+    marginHorizontal: spacing.lg,
+    minWidth: TIMER_MIN_WIDTH,
     textAlign: 'center',
   },
 });

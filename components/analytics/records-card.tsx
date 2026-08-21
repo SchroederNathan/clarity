@@ -1,11 +1,13 @@
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Fragment } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ScoreValue } from '@/components/metrics';
-import { fonts } from '@/constants/fonts';
-import { metricColors } from '@/constants/metrics';
+import { GlassSurface, ThemedText } from '@/components/ui';
+import { fonts, radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+const ICON_TILE_SIZE = 40;
 
 /**
  * All-time bests. Every row here has a weekly counterpart in the counters
@@ -23,102 +25,82 @@ export type RecordRow = {
 };
 
 export function RecordsCard({ rows }: { rows: readonly RecordRow[] }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+  const { colors } = useTheme();
 
-  const body = (
-    <>
+  return (
+    <GlassSurface radius="xl" style={styles.card}>
       {rows.map((row, i) => (
         <Fragment key={row.title}>
-          {i > 0 && <View style={[styles.divider, { backgroundColor: theme.divider }]} />}
+          {i > 0 && <View style={[styles.divider, { backgroundColor: colors.divider }]} />}
           <View style={styles.row}>
-            <View style={[styles.iconTile, { backgroundColor: theme.iconTile }]}>
-              <HugeiconsIcon icon={row.icon} size={20} color={theme.ink} strokeWidth={1.7} />
+            <View style={[styles.iconTile, { backgroundColor: colors.fill }]}>
+              <HugeiconsIcon icon={row.icon} size={20} color={colors.foreground} strokeWidth={1.7} />
             </View>
             <View style={styles.text}>
-              <Text style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
+              <ThemedText variant="callout" weight="semibold" numberOfLines={1}>
                 {row.title}
-              </Text>
-              <Text style={[styles.caption, { color: theme.caption }]} numberOfLines={1}>
+              </ThemedText>
+              <ThemedText
+                variant="footnote"
+                weight="regular"
+                tone="tertiary"
+                numberOfLines={1}>
                 {row.caption}
-              </Text>
+              </ThemedText>
             </View>
             <View style={styles.trailing}>
               {row.isScore ? (
                 <ScoreValue value={row.value} size={19} maxSize={13} />
               ) : (
                 <>
-                  <Text style={[styles.value, { color: theme.ink }]}>{row.value}</Text>
-                  <Text style={[styles.unit, { color: theme.unit }]}>{row.unit}</Text>
+                  <Text style={[styles.value, { color: colors.foreground }]}>{row.value}</Text>
+                  <ThemedText variant="footnote" weight="semibold" tone="tertiary">
+                    {row.unit}
+                  </ThemedText>
                 </>
               )}
             </View>
           </View>
         </Fragment>
       ))}
-    </>
-  );
-
-  return hasGlass ? (
-    <GlassView
-      glassEffectStyle="regular"
-      style={[styles.card, { backgroundColor: theme.glassTint }]}>
-      {body}
-    </GlassView>
-  ) : (
-    <View style={[styles.card, { backgroundColor: theme.solidFallback }]}>{body}</View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    paddingVertical: 6,
-    paddingHorizontal: 18,
-    borderRadius: 32,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-    paddingVertical: 14,
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
   },
   iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderCurve: 'continuous',
+    width: ICON_TILE_SIZE,
+    height: ICON_TILE_SIZE,
+    borderRadius: radius.full,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
     flex: 1,
-    gap: 1,
-  },
-  title: {
-    fontSize: 16,
-    fontFamily: fonts.semibold,
-  },
-  caption: {
-    fontSize: 13,
-    fontFamily: fonts.regular,
+    gap: spacing.xxs,
   },
   trailing: {
     flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
+    gap: spacing.xs,
   },
+  /** Sized to match `ScoreValue` at 19 so a score row and a count row put their
+   * numbers on the same baseline. */
   value: {
     fontSize: 19,
     fontFamily: fonts.heavy,
-  },
-  unit: {
-    fontSize: 13,
-    fontFamily: fonts.semibold,
   },
   divider: {
     height: 1,

@@ -8,7 +8,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   useColorScheme,
   useWindowDimensions,
   View,
@@ -23,7 +22,8 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { colors as themeColors, radius, spacing } from '@/constants/theme';
 
 /** Opal-style layout: 2 full cards centered with a 15% peek of the next card
  * on each side, so the row reads as horizontally scrollable at a glance. */
@@ -32,23 +32,24 @@ const PEEK_RATIO = 0.15;
 const VISIBLE_RATIO = ITEMS_CENTERED + PEEK_RATIO * 2;
 /** Outer padding (not margin/gap) on each item keeps the visual gap stable
  * while the card scales down inside its layout box. */
-const ITEM_GAP = 6;
-const CARD_RADIUS = 36;
+const ITEM_GAP = spacing.sm;
+const CARD_RADIUS = radius.xl;
+/** The "Start" pill on a card. Visual only — the whole card is pressable. */
+const BUTTON_HEIGHT = 40;
 /** Width / height of the card's layout box, matched to the design mock. */
 const CARD_ASPECT = 0.88;
 
-const THEME = {
-  light: {
-    // Light backgrounds shine through glass more, so the tint is stronger.
-    glassTint: 'rgba(14,14,22,0.60)',
-    solidFallback: 'rgba(20,20,28,0.98)',
-    buttonFill: 'rgba(255,255,255,0.22)',
-  },
-  dark: {
-    glassTint: 'rgba(10,10,16,0.45)',
-    solidFallback: 'rgba(18,18,24,0.98)',
-    buttonFill: 'rgba(255,255,255,0.22)',
-  },
+/**
+ * A passage card is the app's one INVERTED surface: dark in both schemes, so its
+ * artwork reads and its white text keeps contrast. That's why the tint doesn't
+ * come from `colors.glassTint` — this is the opposite direction — and why the
+ * two entries aren't a light/dark pair of the same thing but two strengths of
+ * the same dark tint. Text and controls on it use the `onArtwork*` tokens.
+ */
+const CARD_TINT = {
+  // Light backgrounds shine through glass more, so the tint is stronger.
+  light: { glass: 'rgba(14,14,22,0.60)', solid: 'rgba(20,20,28,0.98)' },
+  dark: { glass: 'rgba(10,10,16,0.45)', solid: 'rgba(18,18,24,0.98)' },
 } as const;
 
 export type PassageItem = {
@@ -137,7 +138,7 @@ const PassageCard = memo(function PassageCard({
   onStart,
 }: PassageCardProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
+  const tint = CARD_TINT[scheme];
   const hasGlass = isLiquidGlassAvailable();
 
   // Cards at the visual center stay full size and sharp; they shrink to 0.88
@@ -176,8 +177,10 @@ const PassageCard = memo(function PassageCard({
 
   const buttonContent = (
     <>
-      <HugeiconsIcon icon={PlayIcon} size={15} color="#FFFFFF" />
-      <Text style={styles.buttonLabel}>Start</Text>
+      <HugeiconsIcon icon={PlayIcon} size={15} color={themeColors.light.onArtwork} />
+      <ThemedText variant="subhead" style={styles.buttonLabel}>
+        Start
+      </ThemedText>
     </>
   );
 
@@ -230,15 +233,17 @@ const PassageCard = memo(function PassageCard({
         />
       </View>
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
+        <ThemedText variant="headline" weight="bold" style={styles.title} numberOfLines={2}>
           {item.title}
-        </Text>
-        <Text style={styles.duration}>{item.duration}</Text>
+        </ThemedText>
+        <ThemedText variant="footnote" style={styles.duration}>
+          {item.duration}
+        </ThemedText>
         {/* Purely visual affordance — the WHOLE card is the pressable. The
             pill lives INSIDE the card's glass so it expands with the
             interactive response; it can't be its own GlassView because
             nested glass doesn't render on iOS 26. */}
-        <View style={[styles.button, { backgroundColor: theme.buttonFill }]}>
+        <View style={[styles.button, { backgroundColor: themeColors.light.artworkFill }]}>
           {buttonContent}
         </View>
       </View>
@@ -255,12 +260,12 @@ const PassageCard = memo(function PassageCard({
           <GlassView
             glassEffectStyle="regular"
             isInteractive
-            style={[styles.cardFill, styles.cardShape, { backgroundColor: theme.glassTint }]}>
+            style={[styles.cardFill, styles.cardShape, { backgroundColor: tint.glass }]}>
             {cardBody}
           </GlassView>
         ) : (
           <View
-            style={[styles.cardFill, styles.cardShape, { backgroundColor: theme.solidFallback }]}>
+            style={[styles.cardFill, styles.cardShape, { backgroundColor: tint.solid }]}>
             {cardBody}
           </View>
         )}
@@ -309,35 +314,27 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 14,
+    padding: spacing.lg,
     justifyContent: 'flex-end',
   },
   title: {
-    fontSize: 18,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-    color: '#FFFFFF',
+    color: themeColors.light.onArtwork,
   },
   duration: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 2,
-    marginBottom: 10,
+    color: themeColors.light.onArtworkMuted,
+    marginTop: spacing.xxs,
+    marginBottom: spacing.md,
   },
   button: {
-    height: 40,
-    borderRadius: 20,
-    borderCurve: 'continuous',
+    height: BUTTON_HEIGHT,
+    borderRadius: radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: spacing.sm,
   },
   buttonLabel: {
-    fontSize: 15,
-    fontFamily: fonts.semibold,
-    color: '#FFFFFF',
+    color: themeColors.light.onArtwork,
   },
   blurClip: {
     position: 'absolute',

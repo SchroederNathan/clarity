@@ -2,15 +2,19 @@ import { ArrowDown01Icon } from '@hugeicons-pro/core-stroke-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CHROME_BLUR_BLEED, ProgressiveBlur } from '@/components/glass-tabs';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { sessionColors } from '@/constants/session-theme';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
+/** Minimum comfortable touch target, and the circle buttons' diameter. */
 const BUTTON_SIZE = 44;
+
+/** Gap between the safe-area top and the bar. */
+const BAR_TOP_GAP = spacing.sm;
 
 type CircleButtonProps = {
   onPress: () => void;
@@ -18,18 +22,21 @@ type CircleButtonProps = {
 };
 
 function CircleButton({ onPress, children }: CircleButtonProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
+  const { colors } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
 
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={({ pressed }) => !hasGlass && pressed && { opacity: 0.7 }}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      hitSlop={spacing.sm}
+      style={({ pressed }) => !hasGlass && pressed && styles.pressed}>
       {hasGlass ? (
         <GlassView glassEffectStyle="regular" isInteractive style={styles.circle}>
           {children}
         </GlassView>
       ) : (
-        <View style={[styles.circle, { backgroundColor: colors.circleButton }]}>{children}</View>
+        <View style={[styles.circle, { backgroundColor: colors.fillStrong }]}>{children}</View>
       )}
     </Pressable>
   );
@@ -48,8 +55,7 @@ export type SessionTopBarProps = {
  * positioned over the screen so content scrolls beneath it. */
 export function SessionTopBar({ onDismiss, onTextSize, children }: SessionTopBarProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const foreground = palette[scheme].foreground;
+  const { colors, scheme } = useTheme();
 
   return (
     <>
@@ -58,12 +64,12 @@ export function SessionTopBar({ onDismiss, onTextSize, children }: SessionTopBar
         tint={scheme}
         style={[
           styles.blur,
-          { height: insets.top + 6 + BUTTON_SIZE + CHROME_BLUR_BLEED },
+          { height: insets.top + BAR_TOP_GAP + BUTTON_SIZE + CHROME_BLUR_BLEED },
         ]}
       />
-      <View style={[styles.bar, { top: insets.top + 6 }]} pointerEvents="box-none">
+      <View style={[styles.bar, { top: insets.top + BAR_TOP_GAP }]} pointerEvents="box-none">
         <CircleButton onPress={onDismiss}>
-          <HugeiconsIcon icon={ArrowDown01Icon} size={24} color={foreground} strokeWidth={2} />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={24} color={colors.foreground} strokeWidth={2} />
         </CircleButton>
 
         <View style={styles.center} pointerEvents="none">
@@ -72,7 +78,7 @@ export function SessionTopBar({ onDismiss, onTextSize, children }: SessionTopBar
 
         {onTextSize ? (
           <CircleButton onPress={onTextSize}>
-            <Text style={[styles.textSizeLabel, { color: foreground }]}>Aa</Text>
+            <ThemedText variant="headline">Aa</ThemedText>
           </CircleButton>
         ) : (
           <View style={styles.spacer} />
@@ -93,14 +99,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
   },
   circle: {
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -113,8 +119,7 @@ const styles = StyleSheet.create({
     width: BUTTON_SIZE,
     height: BUTTON_SIZE,
   },
-  textSizeLabel: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
+  pressed: {
+    opacity: 0.7,
   },
 });

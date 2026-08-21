@@ -1,7 +1,8 @@
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { metricColors, SKILL_ORDER } from '@/constants/metrics';
+import { GlassSurface } from '@/components/ui';
+import { SKILL_ORDER } from '@/constants/metrics';
+import { spacing } from '@/constants/theme';
 import { focusSkill } from '@/lib/score';
 import type { SkillEstimate, SkillKey } from '@/types/history';
 
@@ -25,41 +26,28 @@ export type SkillCardProps = {
 };
 
 export function SkillCard({ skills, captions, deltas }: SkillCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
-  const hasGlass = isLiquidGlassAvailable();
-
   const focus = focusSkill(skills);
 
-  const body = SKILL_ORDER.map((skill) => (
-    <SkillRow
-      key={skill}
-      skill={skill}
-      score={skills[skill].samples > 0 ? skills[skill].value : null}
-      caption={captions?.[skill]}
-      delta={deltas?.[skill]}
-      focus={skill === focus}
-    />
-  ));
-
-  return hasGlass ? (
-    <GlassView
-      glassEffectStyle="regular"
-      style={[styles.card, { backgroundColor: theme.glassTint }]}>
-      {body}
-    </GlassView>
-  ) : (
-    <View style={[styles.card, { backgroundColor: theme.solidFallback }]}>{body}</View>
+  return (
+    <GlassSurface radius="xl" style={styles.card}>
+      {SKILL_ORDER.map((skill) => (
+        <SkillRow
+          key={skill}
+          skill={skill}
+          score={skills[skill].samples > 0 ? skills[skill].value : null}
+          caption={captions?.[skill]}
+          delta={deltas?.[skill]}
+          focus={skill === focus}
+        />
+      ))}
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-    borderRadius: 36,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    gap: 22,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.xxl,
   },
 });

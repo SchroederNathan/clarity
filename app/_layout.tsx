@@ -4,16 +4,16 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState, type ReactNode } from 'react';
-import { useColorScheme } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ProgressiveBlur } from '@/components/glass-tabs';
 import { IntroRevealProvider, SplashOverlay } from '@/components/splash';
-import { palette } from '@/constants/colors';
-import { fontAssets, fonts } from '@/constants/fonts';
+import { fontAssets, fonts } from '@/constants/theme';
+import { useIntroReveal } from '@/hooks/use-intro-reveal';
 import { AppReadyProvider } from '@/hooks/use-mark-interactive';
 import { SubscriptionProvider } from '@/hooks/use-subscription';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * EAS Observe. The expo-router integration adds per-route navigation metrics
@@ -37,9 +37,8 @@ Observe.configure({
 // before JS content mounts — the surface behind the tab-switch fade always
 // matches the screen color, so no flash.
 function NavThemeProvider({ children }: { children: ReactNode }) {
-  const dark = useColorScheme() === 'dark';
-  const base = dark ? DarkTheme : DefaultTheme;
-  const colors = dark ? palette.dark : palette.light;
+  const { colors, scheme } = useTheme();
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
   const navTheme = {
     ...base,
@@ -72,11 +71,10 @@ function RootLayout() {
   // overlay needs no fonts, so it plays over the wait — only the routes
   // beneath it hold for the font load.
   const [fontsReady, fontError] = useFonts(fontAssets);
-  const dark = useColorScheme() === 'dark';
+  const { scheme } = useTheme();
   // revealed flips when the splash logo ends (content starts staggering in
   // beneath the fade); splashDone flips when the fade completes (overlay unmounts).
-  const [revealed, setRevealed] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
+  const { revealed, setRevealed, splashDone, setSplashDone } = useIntroReveal();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -113,7 +111,7 @@ function RootLayout() {
                       headerBackground: () => (
                         <ProgressiveBlur
                           direction="top"
-                          tint={dark ? 'dark' : 'light'}
+                          tint={scheme}
                           style={{ flex: 1 }}
                         />
                       ),
@@ -134,7 +132,7 @@ function RootLayout() {
               ) : null}
               {/* The splash backdrop inverts the scheme (light mode plays on
                   black), so pin the status bar to stay legible until it's gone. */}
-              <StatusBar style={splashDone ? 'auto' : dark ? 'dark' : 'light'} />
+              <StatusBar style={splashDone ? 'auto' : scheme} />
               {!splashDone ? (
                 <SplashOverlay
                   onReveal={() => setRevealed(true)}

@@ -3,33 +3,15 @@ import { ShuffleIcon } from '@hugeicons-pro/core-stroke-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
+import { GlassSurface, PrimaryButton, ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
 import type { FreestyleTopic } from '@/constants/topics';
+import { useTheme } from '@/hooks/use-theme';
 
-const THEME = {
-  light: {
-    glassTint: 'rgba(255,255,255,0.45)',
-    solidFallback: 'rgba(244,244,246,0.96)',
-    secondary: '#77777E',
-    foreground: '#111114',
-    buttonTint: '#1C1C21',
-    buttonSolid: '#1C1C21',
-    buttonLabel: '#FFFFFF',
-    shuffleBed: 'rgba(17,17,20,0.08)',
-  },
-  dark: {
-    glassTint: 'rgba(10,10,12,0.55)',
-    solidFallback: 'rgba(26,26,30,0.96)',
-    secondary: '#9E9EA6',
-    foreground: '#FFFFFF',
-    buttonTint: '#F2F2F5',
-    buttonSolid: '#F2F2F5',
-    buttonLabel: '#111114',
-    shuffleBed: 'rgba(255,255,255,0.10)',
-  },
-} as const;
+/** Shuffle button. 40pt with `hitSlop` bringing the tap area past 44pt. */
+const SHUFFLE_SIZE = 40;
 
 export type FreestyleCardProps = {
   topic: FreestyleTopic;
@@ -41,8 +23,7 @@ export type FreestyleCardProps = {
  * DailyGoalCard's structure — card glass as an absolute sibling so the
  * button/shuffle GlassViews are never nested inside another glass. */
 export function FreestyleCard({ topic, onShuffle, onStart }: FreestyleCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
+  const { colors } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
 
   const handleShuffle = () => {
@@ -50,134 +31,82 @@ export function FreestyleCard({ topic, onShuffle, onStart }: FreestyleCardProps)
     onShuffle();
   };
 
-  const handleStart = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onStart(topic);
-  };
-
   const shuffleContent = (
-    <HugeiconsIcon icon={ShuffleIcon} size={18} color={theme.foreground} strokeWidth={1.5} />
-  );
-
-  const buttonContent = (
-    <>
-      <HugeiconsIcon icon={Mic02Icon} size={20} color={theme.buttonLabel} />
-      <Text style={[styles.buttonLabel, { color: theme.buttonLabel }]}>Start Speaking</Text>
-    </>
+    <HugeiconsIcon icon={ShuffleIcon} size={18} color={colors.foreground} strokeWidth={1.5} />
   );
 
   return (
     <View style={styles.card}>
-      {hasGlass ? (
-        <GlassView
-          glassEffectStyle="regular"
-          style={[StyleSheet.absoluteFill, styles.cardShape, { backgroundColor: theme.glassTint }]}
-        />
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.cardShape,
-            { backgroundColor: theme.solidFallback },
-          ]}
-        />
-      )}
+      <GlassSurface radius="xl" style={StyleSheet.absoluteFill} />
 
       <View style={styles.topicRow}>
         <View style={styles.topicText}>
-          <Text style={[styles.caption, { color: theme.secondary }]}>Suggested topic</Text>
-          <Text style={[styles.title, { color: theme.foreground }]}>{topic.title}</Text>
+          <ThemedText variant="footnote" tone="secondary">
+            Suggested topic
+          </ThemedText>
+          <ThemedText variant="title3" weight="bold">
+            {topic.title}
+          </ThemedText>
         </View>
-        <Pressable onPress={handleShuffle} hitSlop={8}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Shuffle topic"
+          onPress={handleShuffle}
+          hitSlop={spacing.sm}>
           {hasGlass ? (
             <GlassView glassEffectStyle="regular" isInteractive style={styles.shuffle}>
               {shuffleContent}
             </GlassView>
           ) : (
-            <View style={[styles.shuffle, { backgroundColor: theme.shuffleBed }]}>
+            <View style={[styles.shuffle, { backgroundColor: colors.fillTranslucent }]}>
               {shuffleContent}
             </View>
           )}
         </Pressable>
       </View>
 
-      <Text style={[styles.prompt, { color: theme.secondary }]} numberOfLines={3}>
+      <ThemedText variant="subheadProse" tone="secondary" style={styles.prompt} numberOfLines={3}>
         {topic.prompt}
-      </Text>
+      </ThemedText>
 
-      <Pressable onPress={handleStart} style={({ pressed }) => pressed && { opacity: 0.85 }}>
-        {hasGlass ? (
-          <GlassView
-            glassEffectStyle="regular"
-            isInteractive
-            tintColor={theme.buttonTint}
-            style={styles.button}>
-            {buttonContent}
-          </GlassView>
-        ) : (
-          <View style={[styles.button, { backgroundColor: theme.buttonSolid }]}>
-            {buttonContent}
-          </View>
-        )}
-      </Pressable>
+      <PrimaryButton
+        title="Start Speaking"
+        icon={Mic02Icon}
+        size="md"
+        onPress={() => onStart(topic)}
+        style={styles.button}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: 20,
-    borderRadius: 36,
-    borderCurve: 'continuous',
-  },
-  cardShape: {
-    borderRadius: 36,
+    padding: spacing.xl,
+    borderRadius: radius.xl,
     borderCurve: 'continuous',
   },
   topicRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: spacing.md,
   },
   topicText: {
     flex: 1,
-    gap: 2,
-  },
-  caption: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
-  },
-  title: {
-    fontSize: 20,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
+    gap: spacing.xxs,
   },
   shuffle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: SHUFFLE_SIZE,
+    height: SHUFFLE_SIZE,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   prompt: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    lineHeight: 21,
-    marginTop: 10,
+    marginTop: spacing.md,
   },
   button: {
-    height: 54,
-    borderRadius: 27,
-    borderCurve: 'continuous',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 16,
-  },
-  buttonLabel: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
+    marginTop: spacing.lg,
   },
 });

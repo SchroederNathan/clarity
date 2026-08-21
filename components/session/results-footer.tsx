@@ -1,15 +1,18 @@
 import { Rotate01Icon, Tick02Icon } from '@hugeicons-pro/core-stroke-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CHROME_BLUR_BLEED, ProgressiveBlur } from '@/components/glass-tabs';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { sessionColors } from '@/constants/session-theme';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 const PILL_HEIGHT = 60;
+
+/** Gap between the pills and the safe-area bottom. */
+const ROW_BOTTOM_GAP = spacing.sm;
 
 export type ResultsFooterProps = {
   onRetry: () => void;
@@ -20,22 +23,22 @@ export type ResultsFooterProps = {
  * progressive blur so results scroll away beneath them. */
 export function ResultsFooter({ onRetry, onDone }: ResultsFooterProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const foreground = palette[scheme].foreground;
+  const { colors, scheme } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
 
   const retryContent = (
     <>
-      <HugeiconsIcon icon={Rotate01Icon} size={20} color={foreground} strokeWidth={1.8} />
-      <Text style={[styles.pillLabel, { color: foreground }]}>Retry</Text>
+      <HugeiconsIcon icon={Rotate01Icon} size={20} color={colors.foreground} strokeWidth={1.8} />
+      <ThemedText variant="headline">Retry</ThemedText>
     </>
   );
 
   const doneContent = (
     <>
-      <HugeiconsIcon icon={Tick02Icon} size={20} color={colors.pillDarkText} strokeWidth={2} />
-      <Text style={[styles.pillLabel, { color: colors.pillDarkText }]}>Done</Text>
+      <HugeiconsIcon icon={Tick02Icon} size={20} color={colors.inverseLabel} strokeWidth={2} />
+      <ThemedText variant="headline" tone="inverse">
+        Done
+      </ThemedText>
     </>
   );
 
@@ -46,8 +49,11 @@ export function ResultsFooter({ onRetry, onDone }: ResultsFooterProps) {
         tint={scheme}
         style={[styles.blur, { top: -CHROME_BLUR_BLEED }]}
       />
-      <View style={[styles.row, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
+      <View
+        style={[styles.row, { paddingBottom: insets.bottom + ROW_BOTTOM_GAP }]}
+        pointerEvents="box-none">
         <Pressable
+          accessibilityRole="button"
           onPress={onRetry}
           style={({ pressed }) => [styles.pillWrap, pressed && !hasGlass && styles.pressed]}>
           {hasGlass ? (
@@ -55,25 +61,26 @@ export function ResultsFooter({ onRetry, onDone }: ResultsFooterProps) {
               {retryContent}
             </GlassView>
           ) : (
-            <View style={[styles.pill, { backgroundColor: colors.circleButton }]}>
+            <View style={[styles.pill, { backgroundColor: colors.fillStrong }]}>
               {retryContent}
             </View>
           )}
         </Pressable>
 
         <Pressable
+          accessibilityRole="button"
           onPress={onDone}
           style={({ pressed }) => [styles.pillWrap, pressed && !hasGlass && styles.pressed]}>
           {hasGlass ? (
             <GlassView
               glassEffectStyle="regular"
               isInteractive
-              tintColor={colors.pillDark}
+              tintColor={colors.inverseSurface}
               style={styles.pill}>
               {doneContent}
             </GlassView>
           ) : (
-            <View style={[styles.pill, { backgroundColor: colors.pillDark }]}>{doneContent}</View>
+            <View style={[styles.pill, { backgroundColor: colors.inverseSurface }]}>{doneContent}</View>
           )}
         </Pressable>
       </View>
@@ -97,24 +104,19 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
   },
   pillWrap: {
     flex: 1,
   },
   pill: {
     height: PILL_HEIGHT,
-    borderRadius: PILL_HEIGHT / 2,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  pillLabel: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
+    gap: spacing.sm,
   },
   pressed: {
     opacity: 0.8,

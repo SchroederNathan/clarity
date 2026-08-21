@@ -1,40 +1,17 @@
 import { useEffect, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { radius, springs } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
+/** Inset of the thumb inside the track. Sub-grid on purpose: it is the visual
+ * hairline that separates thumb from track, not a spacing decision. */
 const TRACK_PADDING = 3;
-const HEIGHT = 44;
-/** Snappy but settled; interruptible when the user taps quickly. */
-const SPRING = { damping: 32, stiffness: 420, mass: 0.9 } as const;
 
-const THEME = {
-  light: {
-    track: 'rgba(17,17,20,0.07)',
-    thumb: '#1C1C21',
-    label: '#111114',
-    activeLabel: '#FFFFFF',
-  },
-  dark: {
-    track: 'rgba(255,255,255,0.08)',
-    thumb: '#F2F2F5',
-    label: '#FFFFFF',
-    activeLabel: '#111114',
-  },
-} as const;
+/** Minimum comfortable touch target. */
+const HEIGHT = 44;
 
 export type SegmentedControlProps = {
   segments: readonly string[];
@@ -52,15 +29,14 @@ export function SegmentedControl({
   onChange,
   style,
 }: SegmentedControlProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
+  const { colors } = useTheme();
 
   const [trackWidth, setTrackWidth] = useState(0);
   const segmentWidth = trackWidth > 0 ? (trackWidth - TRACK_PADDING * 2) / segments.length : 0;
 
   const offset = useSharedValue(selectedIndex);
   useEffect(() => {
-    offset.value = withSpring(selectedIndex, SPRING);
+    offset.value = withSpring(selectedIndex, springs.snap);
   }, [selectedIndex, offset]);
 
   const thumbStyle = useAnimatedStyle(() => ({
@@ -69,13 +45,13 @@ export function SegmentedControl({
 
   return (
     <View
-      style={[styles.track, { backgroundColor: theme.track }, style]}
+      style={[styles.track, { backgroundColor: colors.fillTranslucent }, style]}
       onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}>
       {segmentWidth > 0 && (
         <Animated.View
           style={[
             styles.thumb,
-            { width: segmentWidth, backgroundColor: theme.thumb },
+            { width: segmentWidth, backgroundColor: colors.inverseSurface },
             thumbStyle,
           ]}
         />
@@ -86,14 +62,12 @@ export function SegmentedControl({
           onPress={() => {
             if (index !== selectedIndex) onChange(index);
           }}
+          accessibilityRole="button"
+          accessibilityState={{ selected: index === selectedIndex }}
           style={styles.segment}>
-          <Text
-            style={[
-              styles.label,
-              { color: index === selectedIndex ? theme.activeLabel : theme.label },
-            ]}>
+          <ThemedText variant="subhead" tone={index === selectedIndex ? 'inverse' : 'primary'}>
             {segment}
-          </Text>
+          </ThemedText>
         </Pressable>
       ))}
     </View>
@@ -104,8 +78,7 @@ const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
     height: HEIGHT,
-    borderRadius: HEIGHT / 2,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
     padding: TRACK_PADDING,
   },
   thumb: {
@@ -113,16 +86,11 @@ const styles = StyleSheet.create({
     top: TRACK_PADDING,
     bottom: TRACK_PADDING,
     left: TRACK_PADDING,
-    borderRadius: (HEIGHT - TRACK_PADDING * 2) / 2,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
   },
   segment: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  label: {
-    fontSize: 15,
-    fontFamily: fonts.semibold,
   },
 });

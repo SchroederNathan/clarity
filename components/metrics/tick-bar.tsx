@@ -1,6 +1,6 @@
-import { StyleSheet, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { metricColors } from '@/constants/metrics';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * A linear tick meter: a row of rounded bars with the first `fill` fraction
@@ -32,8 +32,7 @@ export function TickBar({
   track,
   style,
 }: TickBarProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
+  const { colors } = useTheme();
   const inked = Math.round(Math.max(0, Math.min(fill, 1)) * tickCount);
 
   return (
@@ -45,7 +44,7 @@ export function TickBar({
             width: tickWidth,
             height,
             borderRadius: tickWidth / 2,
-            backgroundColor: i < inked ? (tick ?? theme.tick) : (track ?? theme.track),
+            backgroundColor: i < inked ? (tick ?? colors.foreground) : (track ?? colors.track),
           }}
         />
       ))}

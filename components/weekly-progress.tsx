@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -8,8 +8,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 const RING_SIZE = 36;
 const STROKE_WIDTH = 2;
@@ -19,11 +20,6 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const DASH_COUNT = 12;
 const DASH_PERIOD = CIRCUMFERENCE / DASH_COUNT;
 const DASH_LENGTH = DASH_PERIOD * 0.45;
-
-const THEME = {
-  light: { ring: '#111114', secondary: '#77777E' },
-  dark: { ring: '#FFFFFF', secondary: '#9E9EA6' },
-} as const;
 
 // Indexed by Date.getDay() (Sunday-first).
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
@@ -75,9 +71,7 @@ function TodayRing({ progress, color }: { progress: number; color: string }) {
  * Dashed ring = missed day, solid ring = completed, partial arc = today's
  * progress; tomorrow is ringless and grayed. */
 export function WeeklyProgress({ todayProgress, history = DEFAULT_HISTORY }: WeeklyProgressProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
-  const colors = palette[scheme];
+  const { colors } = useTheme();
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
@@ -99,18 +93,15 @@ export function WeeklyProgress({ todayProgress, history = DEFAULT_HISTORY }: Wee
             {!day.isTomorrow && (
               // Rotated so today's arc grows from 12 o'clock; the full rings
               // are rotation-invariant apart from the dash seam.
-              <Svg
-                width={RING_SIZE}
-                height={RING_SIZE}
-                style={{ transform: [{ rotate: '-90deg' }] }}>
+              <Svg width={RING_SIZE} height={RING_SIZE} style={styles.ringSvg}>
                 {day.isToday ? (
-                  <TodayRing progress={todayProgress} color={theme.ring} />
+                  <TodayRing progress={todayProgress} color={colors.foreground} />
                 ) : (
                   <Circle
                     cx={RING_SIZE / 2}
                     cy={RING_SIZE / 2}
                     r={RADIUS}
-                    stroke={theme.ring}
+                    stroke={colors.foreground}
                     strokeWidth={STROKE_WIDTH}
                     strokeLinecap="round"
                     strokeDasharray={
@@ -121,21 +112,16 @@ export function WeeklyProgress({ todayProgress, history = DEFAULT_HISTORY }: Wee
                 )}
               </Svg>
             )}
-            <Text
-              style={[
-                styles.letter,
-                { color: day.isTomorrow ? theme.secondary : colors.foreground },
-              ]}>
+            <ThemedText
+              variant="subhead"
+              tone={day.isTomorrow ? 'secondary' : 'primary'}
+              style={styles.letter}>
               {day.letter}
-            </Text>
+            </ThemedText>
           </View>
-          <Text
-            style={[
-              styles.date,
-              { color: day.isTomorrow ? theme.secondary : colors.foreground },
-            ]}>
+          <ThemedText variant="callout" weight="medium" tone={day.isTomorrow ? 'secondary' : 'primary'}>
             {day.dayOfMonth}
-          </Text>
+          </ThemedText>
         </View>
       ))}
     </View>
@@ -146,11 +132,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   cell: {
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   ring: {
     width: RING_SIZE,
@@ -158,13 +144,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  ringSvg: {
+    transform: [{ rotate: '-90deg' }],
+  },
   letter: {
     position: 'absolute',
-    fontSize: 14,
-    fontFamily: fonts.semibold,
-  },
-  date: {
-    fontSize: 16,
-    fontFamily: fonts.medium,
   },
 });

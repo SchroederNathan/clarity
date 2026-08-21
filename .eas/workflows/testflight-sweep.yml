@@ -1,0 +1,80 @@
+# TestFlight sweep: cron backstop, chain target, and manual entry point.
+#
+# Same three jobs as testflight-autofix.yml (triage -> claim -> fix),
+# split into its own file because EAS validates job env against the
+# specific trigger's context: the ${{ app_store_connect.* }} references
+# over there are invalid on a cron or `eas workflow:run` dispatch. This
+# file has no ASC context, so the triage agent runs in sweep mode
+# (FEEDBACK_ID unset): it lists recent screenshot feedback, catching
+# events that never fired. Crash submissions are only fetchable by id,
+# so missed crash events are not recovered here.
+#
+# This workflow is dispatched three ways:
+#   - cron every 6 hours: backstop for missed events, stuck queues, and
+#     stale locks (scripts/testflight-drain.sh steals locks older than 3h)
+#   - the chain: a fix job that finished dispatches this workflow to
+#     drain the next queued issue
+#   - manually (also the smoke test):
+#     eas workflow:run .eas/workflows/testflight-sweep.yml
+#
+# See testflight-autofix.yml for the full design notes and the required
+# EAS environment variables (production).
+name: TestFlight sweep (cron + chain + manual runs)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  triage:
+    name: Triage feedback into the queue
+    environment: production
+    env:
+      # .env.local is not on the worker, but be explicit: the submit
+      # profile must resolve the production bundle id, not the .dev one.
+      APP_VARIANT: production
+    steps:
+      - uses: eas/checkout
+      # eas-cli evaluates app.config.ts, which needs node_modules.
+      - uses: eas/install_node_modules
+      - name: Queue new reports as issues
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest
+          # --dangerously-skip-permissions: same rationale as agent-fix.yml
+          # (allowlist patterns reject commands expanding GITHUB_TOKEN).
+          # Safe here: ephemeral single-purpose VM with scoped secrets.
+          claude -p "$(cat .agents/triage-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 60 \
+            --output-format json
+
+  claim:
+    name: Claim the oldest queued issue
+    needs: [triage]
+    environment: production
+    env:
+      WORKFLOW_URL: ${{ workflow.url }}
+    outputs:
+      issue_number: ${{ steps.claim.outputs.issue_number }}
+    steps:
+      - uses: eas/checkout
+      - id: claim
+        name: Lock the queue and pick
+        run: bash scripts/testflight-drain.sh claim
+
+  fix:
+    name: Fix the claimed issue, verify, open PR
+    needs: [claim]
+    if: ${{ needs.claim.outputs.issue_number != '' }}
+    environment: production
+    env:
+      ISSUE_NUMBER: ${{ needs.claim.outputs.issue_number }}
+      WORKFLOW_URL: ${{ workflow.url }}
+      APP_VARIANT: production
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Run fix agent, release lock, chain
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest
+          bash scripts/testflight-drain.sh fix

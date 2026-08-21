@@ -7,12 +7,13 @@
 
 import { DRILLS, getDrill } from '@/constants/drills';
 import { getPassage, PASSAGES } from '@/constants/passages';
+import { getGeneratedPassage } from '@/services/practice-generation';
 import { getCustomPassage } from '@/services/user-passages';
 import type { SessionMode } from '@/types/history';
 import type { Passage } from '@/types/session';
 
 export function getAnyPassage(id: string | undefined): Passage | undefined {
-  return getPassage(id) ?? getDrill(id) ?? getCustomPassage(id);
+  return getPassage(id) ?? getDrill(id) ?? getCustomPassage(id) ?? getGeneratedPassage(id);
 }
 
 /** Session-record mode from the content id's namespace. */

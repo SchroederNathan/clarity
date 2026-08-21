@@ -26,7 +26,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
 
-import { fonts } from '@/constants/fonts';
+import { colors, fonts, radius, springs } from '@/constants/theme';
 
 import { MINIMIZE_SPRING, setMinimized, useMinimizeState } from './minimize-context';
 import { CHROME_BLUR_BLEED, ProgressiveBlur } from './progressive-blur';
@@ -42,6 +42,9 @@ const ITEM_WIDTH_MINIMIZED = 58;
 /** Inner inset between the capsule wall and the tab items. */
 const ROW_PAD_H = 4;
 const LABEL_HEIGHT = 13;
+/** Below the type ramp's smallest step on purpose: a tab label has to fit an
+ * 80pt item beside four siblings, and the icon above it carries the meaning. */
+const LABEL_FONT_SIZE = 9.5;
 const ICON_SIZE = 21;
 /** Space between icon and label — folded into the label's animated height so
  * it fully disappears when minimized (keeps the icon perfectly centered). */
@@ -56,7 +59,7 @@ const HIGHLIGHT_MINIMIZED = ICON_SIZE + ITEM_PAD_V * 2;
  * preserved velocity. Slight under-damping gives the pill a tiny settle,
  * safe here because it's transform-only (no layout involved).
  */
-const SLIDE_SPRING = { duration: 420, dampingRatio: 0.82 };
+const SLIDE_SPRING = springs.settle;
 
 export type GlassTabBarTheme = {
   activeTint: string;
@@ -69,20 +72,27 @@ export type GlassTabBarTheme = {
   solidFallback: string;
 };
 
+/** The bar's own highlight pill. Lighter than `colors.fillTranslucent`: it sits
+ * on top of glass and behind a label, so a heavier fill muddies the text. */
+const HIGHLIGHT = {
+  light: 'rgba(0,0,0,0.07)',
+  dark: 'rgba(255,255,255,0.14)',
+} as const;
+
 const DARK_THEME: GlassTabBarTheme = {
-  activeTint: '#FFFFFF',
-  inactiveTint: '#9E9EA6',
-  highlight: 'rgba(255,255,255,0.14)',
-  glassTint: 'rgba(10,10,12,0.55)',
-  solidFallback: 'rgba(18,18,20,0.94)',
+  activeTint: colors.dark.foreground,
+  inactiveTint: colors.dark.secondary,
+  highlight: HIGHLIGHT.dark,
+  glassTint: colors.dark.glassTint,
+  solidFallback: colors.dark.glassFallback,
 };
 
 const LIGHT_THEME: GlassTabBarTheme = {
-  activeTint: '#111114',
-  inactiveTint: '#77777E',
-  highlight: 'rgba(0,0,0,0.07)',
-  glassTint: 'rgba(255,255,255,0.45)',
-  solidFallback: 'rgba(244,244,246,0.96)',
+  activeTint: colors.light.foreground,
+  inactiveTint: colors.light.secondary,
+  highlight: HIGHLIGHT.light,
+  glassTint: colors.light.glassTint,
+  solidFallback: colors.light.glassFallback,
 };
 
 export type GlassTabItem = {
@@ -246,7 +256,7 @@ export function GlassTabBar({
       [EXPANDED_HEIGHT, MINIMIZED_HEIGHT],
       Extrapolation.CLAMP,
     );
-    return { borderRadius: height / 2 };
+    return { borderRadius: radius.full };
   });
 
   // One shared highlight that slides between tabs (transform-only → GPU).
@@ -273,7 +283,7 @@ export function GlassTabBar({
     return {
       height,
       width: itemWidth,
-      borderRadius: height / 2,
+      borderRadius: radius.full,
       top: (barHeight - height) / 2,
       transform: [{ translateX: ROW_PAD_H + itemWidth * slideIndex.value }],
     };
@@ -455,10 +465,18 @@ export function GlassTabButton({
         {/* Fades out and is clipped by the shrinking box — no layout anim. */}
         <Animated.Text
           numberOfLines={1}
-          style={[{ fontSize: 9.5, fontFamily: fonts.semibold, marginTop: ITEM_GAP }, labelStyle]}>
+          style={[styles.label, labelStyle]}>
           {item.label}
         </Animated.Text>
       </Animated.View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  label: {
+    fontSize: LABEL_FONT_SIZE,
+    fontFamily: fonts.semibold,
+    marginTop: ITEM_GAP,
+  },
+});

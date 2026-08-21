@@ -3,12 +3,15 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassContainer, GlassView } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, useColorScheme } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
 import { useSubscription } from '@/hooks/use-subscription';
+import { useTheme } from '@/hooks/use-theme';
 
+/** The streak flame. Not a palette token: it is an illustrative glyph color,
+ * fixed in both schemes, and nothing else in the app uses it. */
 const STREAK_FLAME = '#FF9500';
 const PRO_GOLD = '#FFB000';
 
@@ -16,8 +19,7 @@ const PRO_GOLD = '#FFB000';
  * flame + count, and the profile avatar. GlassContainer lets the capsules
  * merge fluidly when they get close. */
 export function HeaderActions({ streak }: { streak: number }) {
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? palette.dark : palette.light;
+  const { colors } = useTheme();
   const { access } = useSubscription();
 
   /**
@@ -32,10 +34,12 @@ export function HeaderActions({ streak }: { streak: number }) {
   };
 
   return (
-    <GlassContainer spacing={8} style={styles.row}>
+    <GlassContainer spacing={spacing.sm} style={styles.row}>
       <GlassView isInteractive style={styles.streak}>
         <HugeiconsIcon icon={FireIcon} size={24} color={STREAK_FLAME} />
-        <Text style={[styles.streakCount, { color: colors.foreground }]}>{streak}</Text>
+        <ThemedText variant="callout" weight="medium">
+          {streak}
+        </ThemedText>
       </GlassView>
       {/* Pressable wraps the glass rather than the reverse: GlassView renders a
           native material, so the touch target has to sit above it. */}
@@ -47,7 +51,7 @@ export function HeaderActions({ streak }: { streak: number }) {
           <HugeiconsIcon
             icon={access.isPro ? Crown02Icon : User03Icon}
             size={24}
-            color={access.isPro ? PRO_GOLD : dark ? '#8E8E93' : '#98989E'}
+            color={access.isPro ? PRO_GOLD : colors.tertiary}
           />
         </GlassView>
       </Pressable>
@@ -59,25 +63,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   streak: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingLeft: 8,
-    paddingRight: 14,
-    paddingVertical: 8,
-    borderRadius: 50,
-    borderCurve: 'continuous',
-  },
-  streakCount: {
-    fontSize: 16,
-    fontFamily: fonts.medium,
+    gap: spacing.sm,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
   },
   avatar: {
-    padding: 8,
-    borderRadius: 50,
+    padding: spacing.sm,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -16,7 +16,7 @@
         "NSPhotoLibraryUsageDescription": "$(PRODUCT_NAME) does not access your photos. This permission is referenced by a system framework used for file handling, and your photo library is never read without your consent.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.schroedernathan.clarity"
+      "bundleIdentifier": "com.schroedernathan.clarityapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +33,7 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "com.android.vending.BILLING"
       ],
-      "package": "com.schroedernathan.clarity"
+      "package": "com.schroedernathan.clarityapp"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -71,7 +71,7 @@
         "origin": "https://exponathan-clarity.expo.app"
       },
       "eas": {
-        "projectId": "654f9e52-e892-44e4-a4b8-9aa700fef15b"
+        "projectId": "c062263d-cdf6-4ddc-9b07-4178349c3006"
       }
     },
     "owner": "exponathan"

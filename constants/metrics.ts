@@ -64,68 +64,11 @@ export const SCORE_BANDS: readonly { min: number; label: string }[] = [
 ] as const;
 
 /**
- * Metric colors. The color rule is encoded by construction: there is no `bad`
- * entry, so no metric can render red.
+ * The color rule for metric surfaces lives in `constants/colors.ts` now, so
+ * metric colors can't drift from the rest of the app. It is still encoded by
+ * construction — the palette has no metric red, so no metric can render one:
  *
- *   - Values are always `ink`. A score is never colored by how good it is.
- *   - `positive` is only for an improving delta; `flat` covers flat/declining.
+ *   - Values are always `foreground`. A score is never colored by how good it is.
+ *   - `positive` is only for an improving delta; `tertiary` covers flat/declining.
  *   - `focus` is only for the single FOCUS pill on the weakest skill.
- *
- * Dark values are derived from the already-tuned maps in `progress-card.tsx`
- * and `empty-state-card.tsx` so metric surfaces match the rest of the app.
  */
-export const metricColors = {
-  light: {
-    ink: '#111114',
-    /** Small unit/suffix after a value ("/100", "min"). */
-    unit: '#9A9AA0',
-    /** Secondary caption under a skill name. */
-    caption: '#9E9EA6',
-    /** Eyebrow and counter labels. */
-    label: '#77777E',
-    positive: '#23A55A',
-    positiveBg: '#E7F6EC',
-    flat: '#9A9AA0',
-    focus: '#A96400',
-    focusBg: '#FDEFDC',
-    /** Inked portion of a tick meter. */
-    tick: '#111114',
-    /** Unfilled portion of a tick meter. */
-    track: 'rgba(17,17,20,0.10)',
-    /** Bars for days other than today. */
-    bar: '#C4C4CC',
-    /** Stub bar for a day with no data (and for future days). */
-    barEmpty: '#E6E6EB',
-    divider: '#F1F1F4',
-    /** Icon tile behind a record row's glyph. */
-    iconTile: '#F2F2F5',
-    glassTint: 'rgba(255,255,255,0.45)',
-    solidFallback: 'rgba(255,255,255,0.96)',
-  },
-  dark: {
-    ink: '#FFFFFF',
-    unit: '#7C7C84',
-    caption: '#9E9EA6',
-    label: '#9E9EA6',
-    positive: '#2ECC71',
-    positiveBg: 'rgba(46,204,113,0.16)',
-    flat: '#7C7C84',
-    focus: '#F0B458',
-    focusBg: 'rgba(240,180,88,0.16)',
-    tick: '#FFFFFF',
-    track: 'rgba(255,255,255,0.14)',
-    bar: '#4A4A52',
-    barEmpty: 'rgba(255,255,255,0.10)',
-    divider: 'rgba(255,255,255,0.08)',
-    iconTile: 'rgba(255,255,255,0.08)',
-    glassTint: 'rgba(10,10,12,0.55)',
-    solidFallback: 'rgba(26,26,30,0.96)',
-  },
-} as const;
-
-/** One scheme's colors. Widened to `string` so the light and dark maps are
- * interchangeable — `as const` above would otherwise pin each key to its own
- * literal hex and make the two incompatible. */
-export type MetricColors = {
-  readonly [K in keyof (typeof metricColors)['light']]: string;
-};

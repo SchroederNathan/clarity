@@ -6,13 +6,16 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { springs } from '@/constants/theme';
+
 /**
  * Spring, not timing: scroll direction flips mid-animation constantly, and a
  * spring retargets while preserving velocity — a timing curve would restart
- * from zero and feel mechanical. Critically damped (ratio 1): no overshoot
- * and no long settling tail, which matters because the bar animates layout.
+ * from zero and feel mechanical. `springs.glide` is critically damped: no
+ * overshoot and no long settling tail, which matters because the bar animates
+ * layout.
  */
-export const MINIMIZE_SPRING = { duration: 380, dampingRatio: 1 };
+export const MINIMIZE_SPRING = springs.glide;
 
 export type MinimizeState = {
   /** 0 = expanded (icons + labels), 1 = minimized (icons only). */

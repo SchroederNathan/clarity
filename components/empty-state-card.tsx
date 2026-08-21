@@ -1,27 +1,13 @@
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
+import { GlassSurface, ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-const THEME = {
-  light: {
-    glassTint: 'rgba(255,255,255,0.45)',
-    solidFallback: 'rgba(255,255,255,0.96)',
-    iconBg: '#F1F1F4',
-    icon: '#77777E',
-    title: '#111114',
-    subtitle: '#77777E',
-  },
-  dark: {
-    glassTint: 'rgba(10,10,12,0.55)',
-    solidFallback: 'rgba(26,26,30,0.96)',
-    iconBg: 'rgba(255,255,255,0.08)',
-    icon: '#9E9EA6',
-    title: '#FFFFFF',
-    subtitle: '#9E9EA6',
-  },
-} as const;
+/** Widest the subtitle may run before wrapping. Narrower than the card so the
+ * copy breaks into short, centered lines instead of edge-to-edge ones. */
+const SUBTITLE_MAX_WIDTH = 260;
 
 export type EmptyStateCardProps = {
   icon: IconSvgElement;
@@ -32,59 +18,43 @@ export type EmptyStateCardProps = {
 /** Frosted placeholder shown where a data section has nothing to display yet —
  * states plainly that there's no data rather than faking any. */
 export function EmptyStateCard({ icon, title, subtitle }: EmptyStateCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = THEME[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+  const { colors } = useTheme();
 
-  const body = (
-    <>
-      <View style={[styles.iconWrap, { backgroundColor: theme.iconBg }]}>
-        <HugeiconsIcon icon={icon} size={24} color={theme.icon} strokeWidth={1.5} />
+  return (
+    <GlassSurface radius="lg" style={styles.card}>
+      <View style={[styles.iconWrap, { backgroundColor: colors.fill }]}>
+        <HugeiconsIcon icon={icon} size={24} color={colors.secondary} strokeWidth={1.5} />
       </View>
-      <Text style={[styles.title, { color: theme.title }]}>{title}</Text>
-      <Text style={[styles.subtitle, { color: theme.subtitle }]}>{subtitle}</Text>
-    </>
-  );
-
-  return hasGlass ? (
-    <GlassView glassEffectStyle="regular" style={[styles.card, { backgroundColor: theme.glassTint }]}>
-      {body}
-    </GlassView>
-  ) : (
-    <View style={[styles.card, { backgroundColor: theme.solidFallback }]}>{body}</View>
+      <ThemedText variant="headline" style={styles.centered}>
+        {title}
+      </ThemedText>
+      <ThemedText variant="footnoteProse" tone="secondary" style={styles.subtitle}>
+        {subtitle}
+      </ThemedText>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    paddingVertical: 28,
-    paddingHorizontal: 24,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xxl,
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.sm,
   },
   iconWrap: {
     width: 52,
     height: 52,
-    borderRadius: 26,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: spacing.sm,
   },
-  title: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
-    letterSpacing: -0.2,
+  centered: {
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    lineHeight: 19,
     textAlign: 'center',
-    maxWidth: 260,
+    maxWidth: SUBTITLE_MAX_WIDTH,
   },
 });

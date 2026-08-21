@@ -2,27 +2,26 @@ import { PauseIcon, PlayIcon, StopIcon } from '@hugeicons-pro/core-solid-rounded
 import { Rotate01Icon } from '@hugeicons-pro/core-stroke-rounded';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CHROME_BLUR_BLEED, ProgressiveBlur } from '@/components/glass-tabs';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
-import { sessionColors } from '@/constants/session-theme';
+import { ThemedText } from '@/components/ui';
+import { radius, spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { PracticeError, PracticeStatus } from '@/types/session';
 
 import { LiveWaveform } from './live-waveform';
 
-const SECONDARY = { light: '#77777E', dark: '#9E9EA6' } as const;
+/** Control-row circle buttons and the pill between them share one height. */
 const CIRCLE = 56;
+
+/** How far the card floats above the safe-area bottom. */
+const CARD_BOTTOM_GAP = spacing.sm;
+
+/** Horizontal inset of the floating card from the screen edges. */
+const CARD_INSET = spacing.md;
 
 export type PracticeControlsProps = {
   status: PracticeStatus;
@@ -49,10 +48,7 @@ export function PracticeControls({
   onErrorDismiss,
 }: PracticeControlsProps) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const foreground = palette[scheme].foreground;
-  const secondary = SECONDARY[scheme];
+  const { colors, scheme } = useTheme();
   const hasGlass = isLiquidGlassAvailable();
 
   const processing = status === 'processing';
@@ -60,24 +56,26 @@ export function PracticeControls({
 
   const pillContent = processing ? (
     <>
-      <ActivityIndicator size="small" color={colors.pillDarkText} />
-      <Text style={[styles.pillLabel, { color: colors.pillDarkText }]}>Scoring…</Text>
+      <ActivityIndicator size="small" color={colors.inverseLabel} />
+      <ThemedText variant="headline" tone="inverse">
+        Scoring…
+      </ThemedText>
     </>
   ) : (
     <>
       <HugeiconsIcon
         icon={paused ? PlayIcon : PauseIcon}
         size={20}
-        color={colors.pillDarkText}
+        color={colors.inverseLabel}
       />
-      <Text style={[styles.pillLabel, { color: colors.pillDarkText }]}>
+      <ThemedText variant="headline" tone="inverse">
         {paused ? 'Resume' : 'Pause'}
-      </Text>
+      </ThemedText>
     </>
   );
 
   return (
-    <View style={[styles.wrap, { bottom: insets.bottom + 8 }]} pointerEvents="box-none">
+    <View style={[styles.wrap, { bottom: insets.bottom + CARD_BOTTOM_GAP }]} pointerEvents="box-none">
       <ProgressiveBlur
         direction="bottom"
         tint={scheme}
@@ -85,7 +83,7 @@ export function PracticeControls({
           styles.blur,
           {
             top: -CHROME_BLUR_BLEED,
-            bottom: -(insets.bottom + 8),
+            bottom: -(insets.bottom + CARD_BOTTOM_GAP),
           },
         ]}
       />
@@ -95,42 +93,44 @@ export function PracticeControls({
         {hasGlass ? (
           <GlassView
             glassEffectStyle="regular"
-            style={[StyleSheet.absoluteFill, styles.cardShape, { backgroundColor: colors.controlCard }]}
+            style={[StyleSheet.absoluteFill, styles.cardShape, { backgroundColor: colors.glassTintStrong }]}
           />
         ) : (
           <View
             style={[
               StyleSheet.absoluteFill,
               styles.cardShape,
-              { backgroundColor: colors.controlCardSolid },
+              { backgroundColor: colors.card },
             ]}
           />
         )}
 
         {status === 'error' ? (
           <View style={styles.errorWrap}>
-            <Text style={[styles.errorTitle, { color: foreground }]}>Something went wrong</Text>
-            <Text style={[styles.errorMessage, { color: secondary }]}>
+            <ThemedText variant="headline">Something went wrong</ThemedText>
+            <ThemedText variant="footnote" tone="secondary" style={styles.errorMessage}>
               {error?.message ?? 'Speech recognition is unavailable right now.'}
-            </Text>
+            </ThemedText>
             <View style={styles.controlsRow}>
               <Pressable
                 onPress={onErrorDismiss}
                 style={({ pressed }) => [
                   styles.pill,
-                  { backgroundColor: colors.circleButton },
+                  { backgroundColor: colors.fillStrong },
                   pressed && styles.pressed,
                 ]}>
-                <Text style={[styles.pillLabel, { color: foreground }]}>Dismiss</Text>
+                <ThemedText variant="headline">Dismiss</ThemedText>
               </Pressable>
               <Pressable
                 onPress={onRestart}
                 style={({ pressed }) => [
                   styles.pill,
-                  { backgroundColor: colors.pillDark },
+                  { backgroundColor: colors.inverseSurface },
                   pressed && styles.pressed,
                 ]}>
-                <Text style={[styles.pillLabel, { color: colors.pillDarkText }]}>Try Again</Text>
+                <ThemedText variant="headline" tone="inverse">
+                  Try Again
+                </ThemedText>
               </Pressable>
             </View>
           </View>
@@ -139,8 +139,8 @@ export function PracticeControls({
             <LiveWaveform
               meterLevel={meterLevel}
               elapsedMs={elapsedMs}
-              barColor={colors.waveformBar}
-              timerColor={foreground}
+              barColor={colors.bar}
+              timerColor={colors.foreground}
             />
             <View style={styles.controlsRow}>
               <Pressable
@@ -148,10 +148,10 @@ export function PracticeControls({
                 disabled={processing}
                 style={({ pressed }) => [
                   styles.circle,
-                  { backgroundColor: colors.circleButton },
+                  { backgroundColor: colors.fillStrong },
                   (pressed || processing) && styles.pressed,
                 ]}>
-                <HugeiconsIcon icon={Rotate01Icon} size={24} color={foreground} strokeWidth={1.8} />
+                <HugeiconsIcon icon={Rotate01Icon} size={24} color={colors.foreground} strokeWidth={1.8} />
               </Pressable>
 
               <Pressable
@@ -159,7 +159,7 @@ export function PracticeControls({
                 disabled={processing}
                 style={({ pressed }) => [
                   styles.pill,
-                  { backgroundColor: colors.pillDark },
+                  { backgroundColor: colors.inverseSurface },
                   pressed && !processing && styles.pressed,
                 ]}>
                 {pillContent}
@@ -170,10 +170,10 @@ export function PracticeControls({
                 disabled={processing}
                 style={({ pressed }) => [
                   styles.circle,
-                  { backgroundColor: colors.circleButton },
+                  { backgroundColor: colors.fillStrong },
                   (pressed || processing) && styles.pressed,
                 ]}>
-                <HugeiconsIcon icon={StopIcon} size={22} color={foreground} />
+                <HugeiconsIcon icon={StopIcon} size={22} color={colors.foreground} />
               </Pressable>
             </View>
           </>
@@ -186,68 +186,57 @@ export function PracticeControls({
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: CARD_INSET,
+    right: CARD_INSET,
   },
   blur: {
     position: 'absolute',
-    left: -12,
-    right: -12,
+    left: -CARD_INSET,
+    right: -CARD_INSET,
   },
   card: {
-    padding: 16,
-    borderRadius: 40,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
   cardShape: {
-    borderRadius: 40,
+    borderRadius: radius.xl,
     borderCurve: 'continuous',
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 14,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   circle: {
     width: CIRCLE,
     height: CIRCLE,
-    borderRadius: CIRCLE / 2,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pill: {
     flex: 1,
     height: CIRCLE,
-    borderRadius: CIRCLE / 2,
-    borderCurve: 'continuous',
+    borderRadius: radius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  pillLabel: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
+    gap: spacing.sm,
   },
   pressed: {
     opacity: 0.75,
   },
   errorWrap: {
     alignItems: 'center',
-    paddingTop: 6,
-  },
-  errorTitle: {
-    fontSize: 17,
-    fontFamily: fonts.semibold,
+    paddingTop: spacing.sm,
   },
   errorMessage: {
-    fontSize: 14,
-    fontFamily: fonts.medium,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 4,
-    paddingHorizontal: 8,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
 });

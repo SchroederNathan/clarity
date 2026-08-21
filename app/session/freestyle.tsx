@@ -1,19 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LiveTranscript } from '@/components/session/live-transcript';
 import { LiveWpm } from '@/components/session/live-wpm';
 import { PracticeControls } from '@/components/session/practice-controls';
 import { SessionTopBar } from '@/components/session/session-top-bar';
-import { palette } from '@/constants/colors';
-import {
-  sessionColors,
-  TELEPROMPTER_TEXT_SIZES,
-} from '@/constants/session-theme';
+import { TELEPROMPTER_TEXT_SIZES } from '@/constants/session-theme';
 import { getTopic, TOPICS } from '@/constants/topics';
+import { useTheme } from '@/hooks/use-theme';
 import { useFreestyleSession } from '@/hooks/use-freestyle-session';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSessionCheckpoint } from '@/hooks/use-session-checkpoint';
@@ -31,15 +28,16 @@ function dismissToHome() {
   }
 }
 
+/** Clears the absolutely-positioned SessionTopBar, plus breathing room. */
+const CONTENT_TOP_GAP = 82;
+
 export default function FreestyleScreen() {
   const { topicId } = useLocalSearchParams<{ topicId?: string }>();
   const topic = getTopic(topicId) ?? TOPICS[0];
 
   useMarkInteractive();
 
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = sessionColors[scheme];
-  const screenPalette = palette[scheme];
+  const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { setResult, retryToken } = useSessionContext();
@@ -177,17 +175,17 @@ export default function FreestyleScreen() {
     finishSession('stopped');
   }, [finishSession]);
 
-  const contentTop = insets.top + 82;
+  const contentTop = insets.top + CONTENT_TOP_GAP;
 
   return (
-    <View style={[styles.screen, { backgroundColor: screenPalette.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <LiveTranscript
         finalText={session.finalTranscript}
         interimText={session.interimTranscript}
         placeholder={topic.prompt}
         fontSize={fontSize}
         colors={{
-          foreground: screenPalette.foreground,
+          foreground: colors.foreground,
           dimmed: colors.dimmed,
           accent: colors.accent,
         }}

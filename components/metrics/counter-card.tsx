@@ -1,11 +1,15 @@
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, Text, useColorScheme, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { fonts } from '@/constants/fonts';
-import { metricColors } from '@/constants/metrics';
+import { GlassSurface, ThemedText } from '@/components/ui';
+import { spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 import { DeltaLabel } from './delta-label';
+
+/** Height of the delta line, reserved whether or not there's a delta, so cards
+ * sitting in a row stay the same height. */
+const DELTA_HEIGHT = 16;
 
 /**
  * One effort counter: labelled icon, a big value with its unit, and the change
@@ -37,80 +41,56 @@ export function CounterCard({
   deltaSuffix,
   style,
 }: CounterCardProps) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const theme = metricColors[scheme];
-  const hasGlass = isLiquidGlassAvailable();
+  const { colors } = useTheme();
 
-  const body = (
-    <>
+  return (
+    <GlassSurface radius="lg" style={[styles.card, style]}>
       <View style={styles.header}>
-        <HugeiconsIcon icon={icon} size={15} color={theme.unit} strokeWidth={1.9} />
-        <Text style={[styles.label, { color: theme.label }]} numberOfLines={1}>
+        <HugeiconsIcon icon={icon} size={15} color={colors.tertiary} strokeWidth={1.9} />
+        <ThemedText variant="footnote" tone="secondary" style={styles.label} numberOfLines={1}>
           {label}
-        </Text>
+        </ThemedText>
       </View>
       <View style={styles.values}>
         <View style={styles.valueRow}>
-          <Text style={[styles.value, { color: theme.ink }]}>{value}</Text>
-          <Text style={[styles.unit, { color: theme.unit }]}>{unit}</Text>
+          <ThemedText variant="displayValue">{value}</ThemedText>
+          <ThemedText variant="footnote" weight="semibold" tone="tertiary">
+            {unit}
+          </ThemedText>
         </View>
         {/* Reserve the delta line even when absent so cards in a row align. */}
         <View style={styles.deltaSlot}>
           {delta != null && <DeltaLabel delta={delta} suffix={deltaSuffix} hideZero />}
         </View>
       </View>
-    </>
-  );
-
-  return hasGlass ? (
-    <GlassView
-      glassEffectStyle="regular"
-      style={[styles.card, { backgroundColor: theme.glassTint }, style]}>
-      {body}
-    </GlassView>
-  ) : (
-    <View style={[styles.card, { backgroundColor: theme.solidFallback }, style]}>{body}</View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    padding: 16,
-    borderRadius: 26,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    gap: 10,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.sm,
   },
   label: {
-    fontSize: 13,
-    fontFamily: fonts.medium,
     flexShrink: 1,
   },
   values: {
-    gap: 3,
+    gap: spacing.xs,
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
-  },
-  value: {
-    fontSize: 26,
-    fontFamily: fonts.heavy,
-    letterSpacing: -0.5,
-  },
-  unit: {
-    fontSize: 13,
-    fontFamily: fonts.semibold,
+    gap: spacing.xs,
   },
   deltaSlot: {
-    height: 16,
+    height: DELTA_HEIGHT,
     justifyContent: 'center',
   },
 });

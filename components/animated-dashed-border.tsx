@@ -27,7 +27,8 @@ type Props = {
   /** Loop duration in ms. Lower = faster dash travel. */
   animationSpeed?: number;
   borderRadius?: number;
-  strokeColor?: string;
+  /** Required: this primitive has no view on what the app's border color is. */
+  strokeColor: string;
   direction?: 'clockwise' | 'counterclockwise';
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
@@ -39,7 +40,7 @@ export function AnimatedDashedBorder({
   gapLength = 6,
   animationSpeed = 1500,
   borderRadius = 26,
-  strokeColor = '#fff',
+  strokeColor,
   direction = 'clockwise',
   style,
   children,

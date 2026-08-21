@@ -1,10 +1,11 @@
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnalyticsUpIcon } from '@hugeicons-pro/core-stroke-rounded';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { DailyGoalCard } from '@/components/daily-goal-card';
 import { EmptyStateCard } from '@/components/empty-state-card';
@@ -14,15 +15,17 @@ import { PassageCarousel } from '@/components/passage-carousel';
 import { ProgressCard } from '@/components/progress-card';
 import { IntroReveal } from '@/components/splash';
 import { WeeklyProgress } from '@/components/weekly-progress';
+import { SectionHeader, ThemedText } from '@/components/ui';
 import { WordsToMaster } from '@/components/words-to-master';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
 import { PASSAGES } from '@/constants/passages';
+import { spacing, TAB_BAR_SCROLL_INSET } from '@/constants/theme';
 import { useMarkInteractive } from '@/hooks/use-mark-interactive';
 import { useSessionRecords, useDerivedStats, useWords } from '@/hooks/use-session-history';
 import { useNow } from '@/hooks/use-now';
 import { useSpeakingSummary } from '@/hooks/use-speaking-summary';
 import { totals } from '@/lib/stats';
+import { generateWordPracticePassage } from '@/services/practice-generation';
+import { speakWord } from '@/services/word-pronunciation';
 
 /** Takes `now` from the shared clock so it refreshes on foreground instead of
  * being frozen at whatever hour the screen first mounted. */
@@ -42,8 +45,6 @@ export default function HomeScreen() {
 
   const onScroll = useMinimizeOnScroll();
   const insets = useSafeAreaInsets();
-  const dark = useColorScheme() === 'dark';
-  const colors = dark ? palette.dark : palette.light;
 
   const now = useNow();
   const stats = useDerivedStats();
@@ -72,15 +73,51 @@ export default function HomeScreen() {
   // could not tell a word the user has since mastered from one they still miss.
   const { toMaster } = useWords(5);
 
+  const [generatingPractice, setGeneratingPractice] = useState(false);
+  const [speakingWord, setSpeakingWord] = useState<string | null>(null);
+
+  const handlePracticeAll = async () => {
+    if (generatingPractice) return;
+    setGeneratingPractice(true);
+    try {
+      const passage = await generateWordPracticePassage(toMaster.map((w) => w.word));
+      router.push(`/session/${passage.id}`);
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        'Passage not created',
+        error instanceof Error ? error.message : 'Passage generation is unavailable right now.',
+      );
+    } finally {
+      setGeneratingPractice(false);
+    }
+  };
+
+  const handleSpeak = async (word: string) => {
+    if (speakingWord) return;
+    setSpeakingWord(word);
+    try {
+      await speakWord(word);
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        'Pronunciation unavailable',
+        error instanceof Error ? error.message : 'Pronunciation audio is unavailable right now.',
+      );
+    } finally {
+      setSpeakingWord(null);
+    }
+  };
+
   return (
     <Animated.ScrollView
       onScroll={onScroll}
       scrollEventThrottle={16}
       style={{ flex: 1 }}
       contentContainerStyle={{
-        paddingTop: insets.top + 24,
-        paddingHorizontal: 20,
-        paddingBottom: 140,
+        paddingTop: insets.top + spacing.xxl,
+        paddingHorizontal: spacing.xl,
+        paddingBottom: TAB_BAR_SCROLL_INSET,
       }}>
       {/* Intro stagger: chrome (header, slot 0 with the tab bar) first, then
           the content cascades top-to-bottom. Anything holding a GlassView
@@ -88,7 +125,7 @@ export default function HomeScreen() {
           opacity — and gets its fade-in from the splash overlay instead. */}
       <View style={styles.header}>
         <IntroReveal order={0}>
-          <Text style={[styles.greeting, { color: colors.foreground }]}>{greeting(now)}</Text>
+          <ThemedText variant="largeTitle">{greeting(now)}</ThemedText>
         </IntroReveal>
         <IntroReveal order={0} fade={false}>
           <HeaderActions streak={stats.streak} />
@@ -101,10 +138,7 @@ export default function HomeScreen() {
         <DailyGoalCard percent={percent} onStartPractice={startPractice} />
       </IntroReveal>
       <IntroReveal order={3}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>For you</Text>
-        <Text style={[styles.sectionSubtitle, { color: dark ? '#9E9EA6' : '#77777E' }]}>
-          Sharpen your speaking with these passages
-        </Text>
+        <SectionHeader title="For you" subtitle="Sharpen your speaking with these passages" />
       </IntroReveal>
       <IntroReveal order={4} fade={false}>
         <PassageCarousel
@@ -113,10 +147,7 @@ export default function HomeScreen() {
         />
       </IntroReveal>
       <IntroReveal order={5}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your progress</Text>
-        <Text style={[styles.sectionSubtitle, { color: dark ? '#9E9EA6' : '#77777E' }]}>
-          Where your speaking stands right now
-        </Text>
+        <SectionHeader title="Your progress" subtitle="Where your speaking stands right now" />
       </IntroReveal>
       <IntroReveal order={6} fade={false} style={styles.sectionCard}>
         {progress ? (
@@ -136,13 +167,16 @@ export default function HomeScreen() {
       {toMaster.length > 0 && (
         <>
           <IntroReveal order={7}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Words to master</Text>
-            <Text style={[styles.sectionSubtitle, { color: dark ? '#9E9EA6' : '#77777E' }]}>
-              The ones that trip you up most often
-            </Text>
+            <SectionHeader title="Words to master" subtitle="The ones that trip you up most often" />
           </IntroReveal>
           <IntroReveal order={8} fade={false} style={styles.sectionCard}>
-            <WordsToMaster words={toMaster} onPracticeAll={startPractice} />
+            <WordsToMaster
+              words={toMaster}
+              onPracticeAll={handlePracticeAll}
+              generating={generatingPractice}
+              onSpeak={handleSpeak}
+              speakingWord={speakingWord}
+            />
           </IntroReveal>
         </>
       )}
@@ -155,27 +189,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 34,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.5,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.3,
-    marginTop: 28,
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-    fontFamily: fonts.regular,
-    marginTop: 4,
-    marginBottom: 4,
+    marginBottom: spacing.xl,
   },
   // Breathing room between a section's title/description block and its card.
   sectionCard: {
-    marginTop: 12,
+    marginTop: spacing.md,
   },
 });

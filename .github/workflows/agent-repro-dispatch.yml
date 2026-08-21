@@ -1,0 +1,51 @@
+# Bridge: GitHub issue label -> EAS workflow dispatch.
+#
+# EAS Workflows has no "issue labeled" trigger today, so this thin GitHub
+# Action forwards the event. All real work (simulator, agent, evidence)
+# happens on EAS in .eas/workflows/agent-repro.yml.
+#
+# Required repository secret:
+#   EXPO_TOKEN - robot access token for the Expo account
+#                (https://expo.dev/settings/access-tokens)
+name: Dispatch agent repro
+
+on:
+  issues:
+    types: [labeled]
+
+# The default GITHUB_TOKEN is read-only in this repo; the ack comment needs
+# issue write access.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dispatch:
+    if: github.event.label.name == 'repro'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # eas workflow:run evaluates app.config.ts, which needs the project's
+      # node_modules to transpile TypeScript. HUGEICONS_TOKEN feeds .npmrc
+      # for the private @hugeicons-pro registry.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        env:
+          HUGEICONS_TOKEN: ${{ secrets.HUGEICONS_TOKEN }}
+      - name: Acknowledge on the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "🤖 Fix agent dispatched. It will reproduce this on an EAS Simulator, then open a fix PR with video evidence."
+      - name: Run agent-fix on EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli@latest workflow:run .eas/workflows/agent-fix.yml \
+            -F issue_number="${{ github.event.issue.number }}" \
+            --non-interactive

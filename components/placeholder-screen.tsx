@@ -1,10 +1,10 @@
-import { StyleSheet, Text, useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useMinimizeOnScroll } from '@/components/glass-tabs';
-import { palette } from '@/constants/colors';
-import { fonts } from '@/constants/fonts';
+import { ThemedText } from '@/components/ui';
+import { spacing, TAB_BAR_SCROLL_INSET } from '@/constants/theme';
 
 /** Temporary screen body while the real screen is built. No backgroundColor
  * here — the navigation theme paints the screen container, which keeps
@@ -12,7 +12,6 @@ import { fonts } from '@/constants/fonts';
 export function PlaceholderScreen({ title }: { title: string }) {
   const onScroll = useMinimizeOnScroll();
   const insets = useSafeAreaInsets();
-  const colors = useColorScheme() === 'dark' ? palette.dark : palette.light;
 
   return (
     <Animated.ScrollView
@@ -20,20 +19,19 @@ export function PlaceholderScreen({ title }: { title: string }) {
       scrollEventThrottle={16}
       style={{ flex: 1 }}
       contentContainerStyle={{
-        paddingTop: insets.top + 24,
-        paddingHorizontal: 20,
-        paddingBottom: 140,
+        paddingTop: insets.top + spacing.xxl,
+        paddingHorizontal: spacing.xl,
+        paddingBottom: TAB_BAR_SCROLL_INSET,
       }}>
-      <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+      <ThemedText variant="largeTitle" style={styles.title}>
+        {title}
+      </ThemedText>
     </Animated.ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: 34,
-    fontFamily: fonts.bold,
-    letterSpacing: -0.5,
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
 });
