@@ -8,7 +8,7 @@ import type {
   PartialAiCoachingBreakdown,
   SpeechCoachStats,
 } from '@/types/ai-coaching';
-import type { ResultWord, SessionResult } from '@/types/session';
+import { PHONEME_WEAK_MAX, type ResultWord, type SessionResult } from '@/types/session';
 
 const MAX_CHALLENGING_WORDS = 5;
 
@@ -52,6 +52,57 @@ export function summarizeWords(words: readonly ResultWord[]): {
 
 const MAX_TRANSCRIPT_EXCERPT = 1_200;
 
+/** Enough sounds to ground a tip, few enough that the prompt stays about the
+ * session rather than about a table. */
+const MAX_WEAK_SOUNDS = 6;
+
+/**
+ * The worst-scoring sounds across the session, worst first.
+ *
+ * Grouped by (word, phoneme) so a sound the reader misses repeatedly is reported
+ * once, at its lowest score, instead of crowding out every other finding.
+ */
+function weakestSounds(words: readonly ResultWord[]): SpeechCoachStats['weakSounds'] {
+  const worst = new Map<string, NonNullable<SpeechCoachStats['weakSounds']>[number]>();
+
+  for (const word of words) {
+    if (!word.phonemes) continue;
+    for (const phoneme of word.phonemes) {
+      if (phoneme.score == null || phoneme.score >= PHONEME_WEAK_MAX) continue;
+      const heard = phoneme.heard?.[0]?.phoneme;
+      const key = `${word.word.toLowerCase()}|${phoneme.phoneme}`;
+      const existing = worst.get(key);
+      if (existing && existing.score <= phoneme.score) continue;
+      worst.set(key, {
+        word: word.word,
+        phoneme: phoneme.phoneme,
+        ...(heard != null && heard !== phoneme.phoneme ? { heard } : {}),
+        score: Math.round(phoneme.score),
+      });
+    }
+  }
+
+  if (worst.size === 0) return undefined;
+  return [...worst.values()].sort((a, b) => a.score - b.score).slice(0, MAX_WEAK_SOUNDS);
+}
+
+/** Prosody flags as counts. Undefined when Azure raised none. */
+function prosodyFlags(words: readonly ResultWord[]): SpeechCoachStats['prosodyFlags'] {
+  let unexpectedBreaks = 0;
+  let missingBreaks = 0;
+  let monotoneWords = 0;
+  for (const word of words) {
+    if (word.prosody?.unexpectedBreak) unexpectedBreaks += 1;
+    if (word.prosody?.missingBreak) missingBreaks += 1;
+    if (word.prosody?.monotone) monotoneWords += 1;
+  }
+  const out: NonNullable<SpeechCoachStats['prosodyFlags']> = {};
+  if (unexpectedBreaks > 0) out.unexpectedBreaks = unexpectedBreaks;
+  if (missingBreaks > 0) out.missingBreaks = missingBreaks;
+  if (monotoneWords > 0) out.monotoneWords = monotoneWords;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function buildSpeechCoachStats(result: SessionResult): SpeechCoachStats {
   const { wordCounts, challengingWords } = summarizeWords(result.words);
   const mode = result.mode ?? 'passage';
@@ -59,6 +110,8 @@ export function buildSpeechCoachStats(result: SessionResult): SpeechCoachStats {
     mode === 'freestyle' && result.transcript
       ? result.transcript.slice(0, MAX_TRANSCRIPT_EXCERPT)
       : undefined;
+  const weakSounds = weakestSounds(result.words);
+  const prosody = prosodyFlags(result.words);
 
   return {
     mode,
@@ -71,10 +124,21 @@ export function buildSpeechCoachStats(result: SessionResult): SpeechCoachStats {
     paceWpm: result.paceWpm,
     targetWpm: result.targetWpm,
     fillerCount: result.fillerCount,
+    ...(result.discourseMarkerCount != null && result.discourseMarkerCount > 0
+      ? { discourseMarkerCount: result.discourseMarkerCount }
+      : {}),
     durationSeconds: Math.round(result.durationMs / 1000),
+    // Measured all along and never sent, so the coach could not mention pauses
+    // even while the results screen printed them under Flow.
+    ...(result.pauseCount != null ? { pauseCount: result.pauseCount } : {}),
+    ...(result.longestPauseMs != null && result.longestPauseMs > 0
+      ? { longestPauseSeconds: Math.round(result.longestPauseMs / 100) / 10 }
+      : {}),
     assessmentSource: result.source,
     wordCounts,
     challengingWords,
+    ...(weakSounds ? { weakSounds } : {}),
+    ...(prosody ? { prosodyFlags: prosody } : {}),
   };
 }
 

@@ -1,0 +1,285 @@
+{
+  "RecognitionStatus": "Success",
+  "NBest": [
+    {
+      "AccuracyScore": 88.0,
+      "FluencyScore": 100.0,
+      "ProsodyScore": 90.8,
+      "CompletenessScore": 89.0,
+      "PronScore": 91.2,
+      "Words": [
+        {
+          "Word": "the",
+          "Offset": 400000,
+          "Duration": 900000,
+          "Confidence": 0.0,
+          "AccuracyScore": 88.0,
+          "ErrorType": "None",
+          "Syllables": [
+            {
+              "Syllable": "ðə",
+              "Grapheme": "the",
+              "Offset": 400000,
+              "Duration": 900000,
+              "AccuracyScore": 80.0
+            }
+          ],
+          "Phonemes": [
+            {
+              "Phoneme": "ð",
+              "Offset": 400000,
+              "Duration": 300000,
+              "AccuracyScore": 79.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "s",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "ð",
+                  "Score": 65.0
+                }
+              ]
+            },
+            {
+              "Phoneme": "ə",
+              "Offset": 800000,
+              "Duration": 500000,
+              "AccuracyScore": 80.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "ə",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "oʊ",
+                  "Score": 98.0
+                }
+              ]
+            }
+          ],
+          "Feedback": {
+            "Prosody": {
+              "Break": {
+                "ErrorTypes": [
+                  "None"
+                ],
+                "BreakLength": 0
+              },
+              "Intonation": {
+                "ErrorTypes": [
+                  "Monotone"
+                ],
+                "Monotone": {
+                  "Confidence": 0.0,
+                  "WordPitchSlopeConfidence": 0.0,
+                  "SyllablePitchDeltaConfidence": 0.32163942
+                }
+              }
+            }
+          }
+        },
+        {
+          "Word": "deep-sea",
+          "Offset": 1400000,
+          "Duration": 3900000,
+          "Confidence": 0.0,
+          "AccuracyScore": 97.0,
+          "ErrorType": "None",
+          "Syllables": [
+            {
+              "Syllable": "dip",
+              "Grapheme": "deep",
+              "Offset": 1400000,
+              "Duration": 2300000,
+              "AccuracyScore": 100.0
+            },
+            {
+              "Syllable": "si",
+              "Grapheme": "sea",
+              "Offset": 3800000,
+              "Duration": 1500000,
+              "AccuracyScore": 90.0
+            }
+          ],
+          "Phonemes": [
+            {
+              "Phoneme": "d",
+              "Offset": 1400000,
+              "Duration": 800000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "d",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "i",
+                  "Score": 7.0
+                }
+              ]
+            },
+            {
+              "Phoneme": "i",
+              "Offset": 2300000,
+              "Duration": 600000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "i",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "d",
+                  "Score": 73.0
+                }
+              ]
+            },
+            {
+              "Phoneme": "p",
+              "Offset": 3000000,
+              "Duration": 700000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "p",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "i",
+                  "Score": 4.0
+                }
+              ]
+            }
+          ],
+          "Feedback": {
+            "Prosody": {
+              "Break": {
+                "ErrorTypes": [
+                  "None"
+                ],
+                "UnexpectedBreak": {
+                  "Confidence": 4.6979867e-08
+                },
+                "MissingBreak": {
+                  "Confidence": 1.0
+                },
+                "BreakLength": 0
+              },
+              "Intonation": {
+                "ErrorTypes": [
+                  "Monotone"
+                ],
+                "Monotone": {
+                  "Confidence": 0.0,
+                  "WordPitchSlopeConfidence": 0.0,
+                  "SyllablePitchDeltaConfidence": 0.32163942
+                }
+              }
+            }
+          }
+        },
+        {
+          "Word": "northern",
+          "Offset": 21500000,
+          "Duration": 3800000,
+          "Confidence": 0.0,
+          "AccuracyScore": 26.0,
+          "ErrorType": "Mispronunciation",
+          "Syllables": [
+            {
+              "Syllable": "nɔɹð",
+              "Grapheme": "north",
+              "Offset": 21500000,
+              "Duration": 2400000,
+              "AccuracyScore": 100.0
+            },
+            {
+              "Syllable": "ɝn",
+              "Grapheme": "ern",
+              "Offset": 24000000,
+              "Duration": 1300000,
+              "AccuracyScore": 57.0
+            }
+          ],
+          "Phonemes": [
+            {
+              "Phoneme": "n",
+              "Offset": 21500000,
+              "Duration": 600000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "n",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "ə",
+                  "Score": 66.0
+                }
+              ]
+            },
+            {
+              "Phoneme": "ɔɹ",
+              "Offset": 22200000,
+              "Duration": 1300000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "ɔɹ",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "θ",
+                  "Score": 1.0
+                }
+              ]
+            },
+            {
+              "Phoneme": "ð",
+              "Offset": 23600000,
+              "Duration": 300000,
+              "AccuracyScore": 100.0,
+              "NBestPhonemes": [
+                {
+                  "Phoneme": "ð",
+                  "Score": 100.0
+                },
+                {
+                  "Phoneme": "θ",
+                  "Score": 5.0
+                }
+              ]
+            }
+          ],
+          "Feedback": {
+            "Prosody": {
+              "Break": {
+                "ErrorTypes": [
+                  "None"
+                ],
+                "UnexpectedBreak": {
+                  "Confidence": 4.6979867e-08
+                },
+                "MissingBreak": {
+                  "Confidence": 1.0
+                },
+                "BreakLength": 0
+              },
+              "Intonation": {
+                "ErrorTypes": [
+                  "Monotone"
+                ],
+                "Monotone": {
+                  "Confidence": 0.0,
+                  "WordPitchSlopeConfidence": 0.0,
+                  "SyllablePitchDeltaConfidence": 0.32163942
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

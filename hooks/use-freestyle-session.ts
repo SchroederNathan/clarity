@@ -6,7 +6,7 @@ import {
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 
-import { countFillers } from '@/lib/fillers';
+import { countDiscourseMarkers, countFillers } from '@/lib/fillers';
 import { tokenizeTranscript } from '@/services/alignment';
 import { claimEngine, releaseEngine } from '@/services/recognition-owner';
 import { buildFreestyleResult } from '@/services/scoring';
@@ -71,6 +71,8 @@ type Machine = {
   /** Total normalized word count across final results. */
   finalWordCount: number;
   fillerCount: number;
+  /** Ambiguous markers. Reported to the coach, never scored. */
+  discourseMarkerCount: number;
   wpmSamples: WpmSample[];
   result: SessionResult | null;
 };
@@ -133,6 +135,7 @@ export function useFreestyleSession(): FreestyleSession {
       finalParts: [],
       finalWordCount: 0,
       fillerCount: 0,
+      discourseMarkerCount: 0,
       wpmSamples: [],
       result: null,
     };
@@ -222,6 +225,7 @@ export function useFreestyleSession(): FreestyleSession {
     m.finalParts = [];
     m.finalWordCount = 0;
     m.fillerCount = 0;
+    m.discourseMarkerCount = 0;
     m.wpmSamples = [];
     m.result = null;
     if (mounted.current) {
@@ -253,6 +257,7 @@ export function useFreestyleSession(): FreestyleSession {
         const norms = tokenizeTranscript(trimmed).map((t) => t.norm);
         m.finalWordCount += norms.length;
         m.fillerCount += countFillers(norms);
+        m.discourseMarkerCount += countDiscourseMarkers(norms);
       }
       if (mounted.current) {
         setFinalTranscript(m.finalParts.join(' '));
@@ -436,6 +441,7 @@ export function useFreestyleSession(): FreestyleSession {
       transcript: m.finalParts.join(' '),
       paceWpm,
       fillerCount: m.fillerCount,
+      discourseMarkerCount: m.discourseMarkerCount,
       durationMs,
       audioUri,
       waveform: waveform ?? waveformFromMeterHistory(m.meterHistory),
@@ -567,6 +573,7 @@ export function useFreestyleSession(): FreestyleSession {
             transcript: m.finalParts.join(' '),
             paceWpm: 0,
             fillerCount: m.fillerCount,
+            discourseMarkerCount: m.discourseMarkerCount,
             durationMs: Math.max(1, Math.round(m.accumulatedActiveMs)),
             audioUri: null,
             waveform: waveformFromMeterHistory(m.meterHistory),

@@ -57,12 +57,68 @@ export type PracticeError = {
 
 export type WordVerdict = 'good' | 'mispronounced' | 'omitted' | 'inserted';
 
+/** One sound inside a word, as Azure scored it. */
+export type ResultPhoneme = {
+  /** IPA symbol the word expects here. */
+  phoneme: string;
+  /** 0–100; null when Azure returned the phoneme without a score. */
+  score: number | null;
+  /**
+   * What Azure thought it actually heard, best first, when that differs from
+   * `phoneme`. This is the difference between "this word scored 42" and "you
+   * said /s/ where this word wants /ʃ/", so it is the one field the word detail
+   * view is built around.
+   */
+  heard?: { phoneme: string; score: number }[];
+};
+
+export type ResultSyllable = {
+  syllable: string;
+  /** The letters this syllable covers, when Azure supplied them. */
+  grapheme?: string;
+  score: number | null;
+};
+
+/** Per-word prosody flags. Present only where Azure flagged something. */
+export type ResultProsody = {
+  unexpectedBreak?: boolean;
+  missingBreak?: boolean;
+  monotone?: boolean;
+};
+
 export type ResultWord = {
   word: string;
   status: WordVerdict;
   /** Azure per-word AccuracyScore 0–100; absent for inserted words and live-fallback results. */
   score?: number;
+  /** Azure phoneme tier. Absent under the live fallback, and on any word Azure
+   * did not assess. */
+  phonemes?: ResultPhoneme[];
+  syllables?: ResultSyllable[];
+  prosody?: ResultProsody;
+  /**
+   * Where this word sits in the session's playable WAV, so the results screen
+   * can replay the user saying this exact word. Ms into `SessionResult.audioUri`.
+   */
+  audioStartMs?: number;
+  audioEndMs?: number;
 };
+
+/** Below this a phoneme is worth pointing at. Azure's own word-level
+ * mispronunciation threshold sits around 60, so this matches it: a callout
+ * should name a sound the user can hear is off. */
+export const PHONEME_WEAK_MAX = 60;
+
+/** The weakest sound in a word, or null when nothing is clearly weakest. A
+ * phoneme has to be both low and the low one to earn a callout. */
+export function weakestPhoneme(word: ResultWord): ResultPhoneme | null {
+  const scored = (word.phonemes ?? []).filter(
+    (p): p is ResultPhoneme & { score: number } => p.score != null,
+  );
+  if (scored.length === 0) return null;
+  const weakest = scored.reduce((low, p) => (p.score < low.score ? p : low), scored[0]);
+  return weakest.score < PHONEME_WEAK_MAX ? weakest : null;
+}
 
 export type SessionResult = {
   /** Defaults to 'passage' when absent (pre-freestyle results). */
@@ -78,6 +134,13 @@ export type SessionResult = {
   paceWpm: number;
   targetWpm: number;
   fillerCount: number;
+  /**
+   * Ambiguous discourse markers (`like`, `so`, `well`). Counted and passed to
+   * the AI coach, deliberately NOT scored: telling a filler `so` from a
+   * connective `so` needs syntax the app does not have, and a count we cannot
+   * stand behind must not move a number the user is judged by.
+   */
+  discourseMarkerCount?: number;
   words: ResultWord[];
   /** Playable WAV (segments concatenated across pauses); null when unavailable. */
   audioUri: string | null;

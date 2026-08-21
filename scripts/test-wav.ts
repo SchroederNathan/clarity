@@ -6,7 +6,7 @@
 
 import { tokenizePassage } from '@/lib/passage-text';
 import { PassageAligner } from '@/services/alignment';
-import type { ChunkAssessment } from '@/services/azure-pronunciation';
+import type { ChunkAssessment } from '@/services/azure-assessment';
 import { speakingScore } from '@/lib/score';
 import {
   buildAzureResult,
@@ -291,13 +291,19 @@ section('scoring: azure aggregation + word mapping');
     prosodyScore: 80,
     pronScore: 88,
     words: [
-      { word: 'alpha', accuracyScore: 95, errorType: 'None' },
-      { word: 'beta', accuracyScore: 45, errorType: 'Mispronunciation' },
-      { word: 'gamma', accuracyScore: null, errorType: 'Omission' },
-      { word: 'um', accuracyScore: null, errorType: 'Insertion' },
-      { word: 'delta', accuracyScore: 92, errorType: 'None' },
-      { word: 'epsilon', accuracyScore: 91, errorType: 'None' },
-      { word: 'zeta', accuracyScore: 90, errorType: 'None' },
+      { word: 'alpha', accuracyScore: 95, errorType: 'None', startMs: 0, durationMs: 400 },
+      {
+        word: 'beta',
+        accuracyScore: 45,
+        errorType: 'Mispronunciation',
+        startMs: 450,
+        durationMs: 400,
+      },
+      { word: 'gamma', accuracyScore: null, errorType: 'Omission', startMs: null, durationMs: null },
+      { word: 'um', accuracyScore: null, errorType: 'Insertion', startMs: 900, durationMs: 200 },
+      { word: 'delta', accuracyScore: 92, errorType: 'None', startMs: 1150, durationMs: 400 },
+      { word: 'epsilon', accuracyScore: 91, errorType: 'None', startMs: 1600, durationMs: 400 },
+      { word: 'zeta', accuracyScore: 90, errorType: 'None', startMs: 2050, durationMs: 400 },
     ],
   };
 

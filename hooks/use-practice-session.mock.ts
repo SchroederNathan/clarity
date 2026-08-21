@@ -26,11 +26,50 @@ import type {
 
 const TICK_MS = 100;
 
+/**
+ * Stand-in phoneme detail for a mispronounced mock word, so the word-detail
+ * panel (syllables, the weak sound, "hear it" vs "hear yours") is reachable on
+ * a simulator, where there is no speech recognizer to produce the real thing.
+ * Deterministic in `i`, like everything else in this fixture.
+ */
+function mockDetail(word: string, i: number): Pick<ResultWord, 'phonemes' | 'syllables'> {
+  const stripped = word.replace(/[^\p{L}\p{N}]/gu, '');
+  const split = Math.max(1, Math.ceil(stripped.length / 2));
+  const weak = MOCK_WEAK_SOUNDS[i % MOCK_WEAK_SOUNDS.length];
+  return {
+    syllables: [
+      { syllable: stripped.slice(0, split), grapheme: stripped.slice(0, split), score: 86 },
+      { syllable: stripped.slice(split), grapheme: stripped.slice(split), score: 34 },
+    ],
+    phonemes: [
+      { phoneme: weak.strong, score: 91 },
+      {
+        phoneme: weak.expected,
+        score: 30 + (i % 12),
+        heard: [
+          { phoneme: weak.heard, score: 68 },
+          { phoneme: weak.expected, score: 30 + (i % 12) },
+        ],
+      },
+    ],
+  };
+}
+
+/** Plausible English confusions, cycled so consecutive words differ. */
+const MOCK_WEAK_SOUNDS = [
+  { strong: 'm', expected: 'ʒ', heard: 'z' },
+  { strong: 'k', expected: 'θ', heard: 's' },
+  { strong: 'b', expected: 'ɹ', heard: 'w' },
+  { strong: 'd', expected: 'v', heard: 'f' },
+] as const;
+
 function buildMockResult(passage: Passage, durationMs: number): SessionResult {
   const { words } = tokenizePassage(passage.text);
   const resultWords: ResultWord[] = words.map((word, i) => {
     if (i > 0 && i % 29 === 0) return { word, status: 'omitted' };
-    if (i > 0 && i % 13 === 0) return { word, status: 'mispronounced', score: 48 + (i % 20) };
+    if (i > 0 && i % 13 === 0) {
+      return { word, status: 'mispronounced', score: 48 + (i % 20), ...mockDetail(word, i) };
+    }
     return { word, status: 'good', score: 90 + (i % 10) };
   });
 
