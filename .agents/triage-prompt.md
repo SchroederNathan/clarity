@@ -1,9 +1,10 @@
 # TestFlight triage agent
 
-You are the triage stage of Clarity's TestFlight autofix workflow
-(.eas/workflows/testflight-autofix.yml). You run headless inside one EAS
-Workflows CI job, fired either by an App Store Connect beta-feedback event
-or by the daily cron sweep. Your job: pull new TestFlight feedback from
+You are the triage stage of Clarity's TestFlight autofix pipeline. You
+run headless inside one EAS Workflows CI job, fired either by an App
+Store Connect beta-feedback event (.eas/workflows/testflight-autofix.yml)
+or by the daily cron sweep / a manual dispatch
+(.eas/workflows/testflight-sweep.yml). Your job: pull new TestFlight feedback from
 App Store Connect, pick at most ONE auto-fixable item, file it as a GitHub
 issue, and hand the issue number to the next step. The fix agent
 (.agents/fix-prompt.md) then runs IN THIS SAME WORKFLOW RUN: it reproduces
@@ -42,8 +43,8 @@ for humans manually dispatching agent-fix.yml.
   - Fetch one submission (works for crashes too):
     `npx --yes eas-cli@latest testflight:feedback "$FEEDBACK_ID" --type "$FEEDBACK_TYPE" --json --non-interactive`
 - Event runs set `FEEDBACK_ID`, `FEEDBACK_TYPE` (`crash` or `screenshot`),
-  and `FEEDBACK_URL`. Cron runs leave them empty. Crash submissions can
-  only be fetched by id, so crashes arrive via event runs; the cron sweep
+  and `FEEDBACK_URL`. Sweep runs do not set them at all. Crash submissions
+  can only be fetched by id, so crashes arrive via event runs; the sweep
   covers screenshot feedback.
 
 ## Steps

@@ -17,7 +17,10 @@ A human reviews and merges; agents never merge.
 ```
 TestFlight tester submits crash/screenshot feedback
    │  testflight-autofix.yml — fired by the App Store Connect
-   │  beta_feedback event AND a daily 13:00 UTC cron sweep
+   │  beta_feedback event. testflight-sweep.yml — the same job on a
+   │  daily 13:00 UTC cron (and `eas workflow:run` for manual/testing);
+   │  split files because EAS rejects ${{ app_store_connect.* }} env
+   │  on non-ASC triggers
    │
    │  step 1 — triage agent (.agents/triage-prompt.md):
    │    fetch via `eas testflight:feedback`, dedupe by the
@@ -65,7 +68,8 @@ Autofix one-time setup, on top of the setup below:
    are only fetchable by submission id from the event context.
 3. Crons only run from the default branch, so the workflow must be on
    `main`.
-4. Manual run: `eas workflow:run .eas/workflows/testflight-autofix.yml`.
+4. Manual run: `eas workflow:run .eas/workflows/testflight-sweep.yml`
+   (the autofix file only accepts the ASC event trigger).
 
 ## One-time setup
 

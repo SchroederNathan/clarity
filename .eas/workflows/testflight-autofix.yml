@@ -16,12 +16,12 @@
 #      exists, run the existing repro -> fix -> verify -> PR loop against
 #      that issue in this same run.
 #
-# Triggers:
-#   - beta_feedback event (requires the ASC connection in EAS project
-#     settings). The trigger context injects the submission id/type/url.
-#   - daily 13:00 UTC cron sweep: ASC events occasionally do not fire.
-#     The sweep lists screenshot feedback only; crashes are fetchable only
-#     by id from the event context. Crons run from the default branch.
+# Trigger: the beta_feedback event only (requires the ASC connection in
+# EAS project settings). The trigger context injects the submission
+# id/type/url. EAS validates job env against the specific trigger's
+# context, so the ${{ app_store_connect.* }} references below make this
+# file un-runnable from cron or `eas workflow:run` — the daily sweep and
+# manual runs live in testflight-sweep.yml instead (same job, no context).
 #
 # Idempotent: every filed issue carries a TestFlight-Feedback-IDs footer
 # the triage agent dedupes against, so overlapping event + cron runs file
@@ -39,8 +39,6 @@
 name: TestFlight autofix (feedback -> issue -> fix -> verified PR)
 
 on:
-  schedule:
-    - cron: '0 13 * * *'
   app_store_connect:
     beta_feedback:
       types:
@@ -52,7 +50,6 @@ jobs:
     name: Triage TestFlight feedback, then fix it in the same run
     environment: production
     env:
-      # Empty on cron runs; set on beta_feedback event runs.
       FEEDBACK_ID: ${{ app_store_connect.beta_feedback.id }}
       FEEDBACK_TYPE: ${{ app_store_connect.beta_feedback.type }}
       FEEDBACK_URL: ${{ app_store_connect.beta_feedback.url }}

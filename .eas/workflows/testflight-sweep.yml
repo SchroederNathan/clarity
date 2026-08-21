@@ -1,0 +1,59 @@
+# Daily TestFlight sweep + the manual test entry point.
+#
+# Same job as testflight-autofix.yml, split into its own file because EAS
+# validates job env against the specific trigger's context: the
+# ${{ app_store_connect.* }} references over there are invalid on a cron
+# or `eas workflow:run` dispatch. This file has no ASC context, so the
+# triage agent runs in sweep mode (FEEDBACK_ID empty): it lists recent
+# screenshot feedback, catching events that never fired. Crash
+# submissions are only fetchable by id, so missed crash events are not
+# recovered here.
+#
+# Manual run (also the smoke test):
+#   eas workflow:run .eas/workflows/testflight-sweep.yml
+#
+# See testflight-autofix.yml for the full design notes and the required
+# EAS environment variables (production).
+name: TestFlight sweep (daily cron + manual runs)
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+
+jobs:
+  autofix:
+    name: Sweep TestFlight feedback, fix at most one finding
+    environment: production
+    env:
+      # .env.local is not on the worker, but be explicit: the submit
+      # profile must resolve the production bundle id, not the .dev one.
+      APP_VARIANT: production
+    steps:
+      - uses: eas/checkout
+      # eas-cli evaluates app.config.ts, which needs node_modules.
+      - uses: eas/install_node_modules
+      - name: Triage feedback into an issue
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest
+          # --dangerously-skip-permissions: same rationale as agent-fix.yml
+          # (allowlist patterns reject commands expanding GITHUB_TOKEN).
+          # Safe here: ephemeral single-purpose VM with scoped secrets.
+          claude -p "$(cat .agents/triage-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 60 \
+            --output-format json
+      - name: Fix the filed issue in this run
+        run: |
+          if [ ! -f TRIAGE_ISSUE_NUMBER ]; then
+            echo "Triage filed no auto-fixable issue; nothing to fix."
+            exit 0
+          fi
+          ISSUE_NUMBER="$(cat TRIAGE_ISSUE_NUMBER)"
+          # consume the handoff so it can't ride along in the fix commit
+          rm TRIAGE_ISSUE_NUMBER
+          case "$ISSUE_NUMBER" in ''|*[!0-9]*) echo "invalid TRIAGE_ISSUE_NUMBER" >&2; exit 1;; esac
+          export ISSUE_NUMBER
+          claude -p "$(cat .agents/fix-prompt.md)" \
+            --dangerously-skip-permissions \
+            --max-turns 120 \
+            --output-format json
