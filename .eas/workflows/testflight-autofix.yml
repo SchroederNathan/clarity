@@ -1,32 +1,45 @@
-# TestFlight feedback in, verified fix PR out — one workflow run.
+# TestFlight feedback in, verified fix PR out — queued, serialized, chained.
 #
 # Modeled on brentvatne/euxy (crash-triage.yml / feedback-triage.yml):
 # the App Store Connect beta_feedback event triggers the run directly and
-# the same run carries the work all the way to a PR. No GitHub label
-# bridge in this path; labeling an issue `repro` by hand still works and
-# dispatches agent-fix.yml as before.
+# the same run carries the work to a PR. No GitHub label bridge in this
+# path; labeling an issue `repro` by hand still works and dispatches
+# agent-fix.yml as before.
 #
-# Two triggers, one job, two agent steps on the same VM:
-#   1. Triage (.agents/triage-prompt.md): fetch feedback via
-#      `eas testflight:feedback` (ASC key comes from the EAS credentials
-#      service), dedupe against existing issues, cluster, pick at most ONE
-#      auto-fixable item, file it as an issue labeled `testflight`, and
-#      write the issue number to TRIAGE_ISSUE_NUMBER.
-#   2. Fix (.agents/fix-prompt.md, unchanged): if TRIAGE_ISSUE_NUMBER
-#      exists, run the existing repro -> fix -> verify -> PR loop against
-#      that issue in this same run.
+# Three jobs, so the pipeline reads as three nodes in the workflow graph:
+#   triage — agent (.agents/triage-prompt.md): fetch feedback via
+#            `eas testflight:feedback` (ASC key comes from the EAS
+#            credentials service), dedupe against existing issues, QUEUE
+#            each new actionable report as an issue labeled
+#            `testflight-queued`. Never blocks, never asks a human.
+#   claim  — scripts/testflight-drain.sh claim: EAS has no run queueing,
+#            so concurrent event runs race. An atomic git-ref lock
+#            (refs/heads/agent-fix-lock, stolen after 3h if stale)
+#            serializes them; the winner claims the OLDEST queued issue,
+#            relabels it `testflight`, and outputs its number. Fast job:
+#            no node_modules, no agent. Losers output nothing; their
+#            queued work is drained by the lock holder's chain or the
+#            cron sweep.
+#   fix    — skipped unless claim output an issue. Runs the fix agent
+#            (.agents/fix-prompt.md, unchanged): repro on an EAS
+#            Simulator -> minimal fix -> verification build -> second
+#            simulator session -> PR with videos. Releases the lock, then
+#            dispatches a sweep run if the queue still has work (the
+#            chain). On agent failure: labels the issue `needs-human` and
+#            still releases + chains.
 #
 # Trigger: the beta_feedback event only (requires the ASC connection in
 # EAS project settings). The trigger context injects the submission
 # id/type/url. EAS validates job env against the specific trigger's
 # context, so the ${{ app_store_connect.* }} references below make this
-# file un-runnable from cron or `eas workflow:run` — the daily sweep and
-# manual runs live in testflight-sweep.yml instead (same job, no context).
+# file un-runnable from cron or `eas workflow:run` — the sweep and manual
+# runs live in testflight-sweep.yml instead (same jobs, no context).
 #
 # Idempotent: every filed issue carries a TestFlight-Feedback-IDs footer
-# the triage agent dedupes against, so overlapping event + cron runs file
-# nothing twice. The issue gets `testflight`, NOT `repro` — the `repro`
-# label would fire the GitHub bridge and dispatch a duplicate fix run.
+# the triage agent dedupes against, so overlapping event + sweep runs file
+# nothing twice. Queued issues get `testflight-queued`, never `repro` —
+# the `repro` label would fire the GitHub bridge and dispatch a duplicate
+# fix run.
 #
 # Required EAS environment variables (production environment) — all
 # already present for agent-fix.yml:
@@ -35,8 +48,9 @@
 #   GITHUB_TOKEN            - fine-grained PAT: Issues, Contents,
 #                             Pull requests (read/write)
 #   EXPO_TOKEN              - eas-cli auth: testflight:feedback, simulator
-#                             sessions, and the verification build
-name: TestFlight autofix (feedback -> issue -> fix -> verified PR)
+#                             sessions, the verification build, and the
+#                             chain dispatch
+name: TestFlight autofix (feedback -> queue -> fix -> verified PR)
 
 on:
   app_store_connect:
@@ -46,8 +60,8 @@ on:
         - screenshot
 
 jobs:
-  autofix:
-    name: Triage TestFlight feedback, then fix it in the same run
+  triage:
+    name: Triage feedback into the queue
     environment: production
     env:
       FEEDBACK_ID: ${{ app_store_connect.beta_feedback.id }}
@@ -60,7 +74,7 @@ jobs:
       - uses: eas/checkout
       # eas-cli evaluates app.config.ts, which needs node_modules.
       - uses: eas/install_node_modules
-      - name: Triage feedback into an issue
+      - name: Queue new reports as issues
         run: |
           npm install -g @anthropic-ai/claude-code@latest
           # --dangerously-skip-permissions: same rationale as agent-fix.yml
@@ -70,18 +84,34 @@ jobs:
             --dangerously-skip-permissions \
             --max-turns 60 \
             --output-format json
-      - name: Fix the filed issue in this run
+
+  claim:
+    name: Claim the oldest queued issue
+    needs: [triage]
+    environment: production
+    env:
+      WORKFLOW_URL: ${{ workflow.url }}
+    outputs:
+      issue_number: ${{ steps.claim.outputs.issue_number }}
+    steps:
+      - uses: eas/checkout
+      - id: claim
+        name: Lock the queue and pick
+        run: bash scripts/testflight-drain.sh claim
+
+  fix:
+    name: Fix the claimed issue, verify, open PR
+    needs: [claim]
+    if: ${{ needs.claim.outputs.issue_number != '' }}
+    environment: production
+    env:
+      ISSUE_NUMBER: ${{ needs.claim.outputs.issue_number }}
+      WORKFLOW_URL: ${{ workflow.url }}
+      APP_VARIANT: production
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Run fix agent, release lock, chain
         run: |
-          if [ ! -f TRIAGE_ISSUE_NUMBER ]; then
-            echo "Triage filed no auto-fixable issue; nothing to fix."
-            exit 0
-          fi
-          ISSUE_NUMBER="$(cat TRIAGE_ISSUE_NUMBER)"
-          # consume the handoff so it can't ride along in the fix commit
-          rm TRIAGE_ISSUE_NUMBER
-          case "$ISSUE_NUMBER" in ''|*[!0-9]*) echo "invalid TRIAGE_ISSUE_NUMBER" >&2; exit 1;; esac
-          export ISSUE_NUMBER
-          claude -p "$(cat .agents/fix-prompt.md)" \
-            --dangerously-skip-permissions \
-            --max-turns 120 \
-            --output-format json
+          npm install -g @anthropic-ai/claude-code@latest
+          bash scripts/testflight-drain.sh fix

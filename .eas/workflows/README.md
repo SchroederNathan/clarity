@@ -18,22 +18,34 @@ A human reviews and merges; agents never merge.
 TestFlight tester submits crash/screenshot feedback
    │  testflight-autofix.yml — fired by the App Store Connect
    │  beta_feedback event. testflight-sweep.yml — the same job on a
-   │  daily 13:00 UTC cron (and `eas workflow:run` for manual/testing);
-   │  split files because EAS rejects ${{ app_store_connect.* }} env
-   │  on non-ASC triggers
+   │  6-hourly cron, as the chain target, and via `eas workflow:run`
+   │  for manual/testing; split files because EAS rejects
+   │  ${{ app_store_connect.* }} env on non-ASC triggers
    │
-   │  step 1 — triage agent (.agents/triage-prompt.md):
+   │  job 1 `triage` — agent (.agents/triage-prompt.md):
    │    fetch via `eas testflight:feedback`, dedupe by the
-   │    TestFlight-Feedback-IDs footer, cluster + score, file at
-   │    most ONE issue labeled `testflight`, write the issue number
-   │    to TRIAGE_ISSUE_NUMBER (speech-dependent reports get
-   │    `needs-human` and stop — the simulator has no microphone)
+   │    TestFlight-Feedback-IDs footer, cluster + rank, QUEUE each
+   │    new actionable report as an issue labeled `testflight-queued`
+   │    (speech-dependent reports get `needs-human` instead — the
+   │    simulator has no microphone). Triage never blocks.
    │
-   │  step 2 — fix agent (.agents/fix-prompt.md), same run:
+   │  job 2 `claim` — scripts/testflight-drain.sh claim (fast, no
+   │    node_modules): EAS can't queue runs, so concurrent event
+   │    runs race. An atomic git-ref lock (agent-fix-lock, stolen
+   │    after 3h if stale) serializes them; the winner claims the
+   │    OLDEST queued issue, relabels it `testflight`, outputs its
+   │    number. Losers output nothing; their queued work is picked
+   │    up by the holder's chain or the cron.
+   │
+   │  job 3 `fix` — skipped unless claim output an issue:
+   │    scripts/testflight-drain.sh fix runs the fix agent, releases
+   │    the lock, and if the queue still has work dispatches a sweep
+   │    run to drain the next issue (the chain).
    ▼
-fix loop (also reachable via: human labels an issue `repro`
+fix loop — .agents/fix-prompt.md (also reachable via: human labels
+   │        an issue `repro`
    │        → .github/workflows/agent-repro-dispatch.yml
-   │        → agent-fix.yml)
+   │        → agent-fix.yml — this path bypasses the queue and lock)
    │ 1. read the issue
    │ 2. EAS Simulator session: install latest simulator build, repro, screenshots
    │ 3. issue comment: steps + observations + ▶ session video link
@@ -53,9 +65,11 @@ The autofix design follows brentvatne/euxy (crash-triage.yml +
 feedback-triage.yml): the `beta_feedback` trigger with its
 `${{ app_store_connect.* }}` context, and `eas testflight:feedback` for
 the content (the ASC API key comes from the EAS credentials service, so
-no ASC secrets live in this repo). The autofix issue is labeled
-`testflight`, NOT `repro` — `repro` would fire the GitHub bridge and
-dispatch a duplicate fix run.
+no ASC secrets live in this repo). Queued issues are labeled
+`testflight-queued`, in-progress ones `testflight`, and NEVER `repro` —
+`repro` would fire the GitHub bridge and dispatch a duplicate fix run.
+If a fix agent fails or gives up, the drain labels the issue
+`needs-human` and moves on; the queue never wedges on one bad issue.
 
 Autofix one-time setup, on top of the setup below:
 
