@@ -15,20 +15,31 @@ import { useTheme } from '@/hooks/use-theme';
 const STREAK_FLAME = '#FF9500';
 const PRO_GOLD = '#FFB000';
 
+function proButtonLabel(isLoading: boolean, isPro: boolean): string {
+  if (isLoading) return 'Checking your subscription';
+  return isPro ? 'Manage Clarity Pro' : 'Get Clarity Pro';
+}
+
 /** The screen-header trailing capsules shared by Home and Practice: streak
  * flame + count, and the profile avatar. GlassContainer lets the capsules
  * merge fluidly when they get close. */
 export function HeaderActions({ streak }: { streak: number }) {
   const { colors } = useTheme();
-  const { access } = useSubscription();
+  const { access, isLoading } = useSubscription();
 
   /**
    * The subscription entry point. Subscribers get the Customer Center, where
    * they can change plan, cancel, or fix a billing problem; everyone else gets
    * the paywall. Routing on entitlement rather than showing both keeps one tap
    * between the customer and the thing they came for.
+   *
+   * The button waits for the first entitlement read rather than routing on the
+   * withheld-by-default `isPro`. That read is served from the SDK's cache and
+   * lands a frame or two into a cold start; sending a paying customer to the
+   * paywall during those frames is the one outcome worth waiting to avoid.
    */
   const openAccount = () => {
+    if (isLoading) return;
     Haptics.selectionAsync();
     router.push(access.isPro ? '/manage-subscription' : '/paywall');
   };
@@ -45,8 +56,10 @@ export function HeaderActions({ streak }: { streak: number }) {
           native material, so the touch target has to sit above it. */}
       <Pressable
         onPress={openAccount}
+        disabled={isLoading}
         accessibilityRole="button"
-        accessibilityLabel={access.isPro ? 'Manage Clarity Pro' : 'Get Clarity Pro'}>
+        accessibilityState={{ disabled: isLoading }}
+        accessibilityLabel={proButtonLabel(isLoading, access.isPro)}>
         <GlassView isInteractive style={styles.avatar}>
           <HugeiconsIcon
             icon={access.isPro ? Crown02Icon : User03Icon}

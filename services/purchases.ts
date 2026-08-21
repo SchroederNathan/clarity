@@ -50,7 +50,7 @@ export type StoreKind = 'test' | 'appStore' | 'playStore';
  */
 export type PurchasesAvailability =
   | { available: true; store: StoreKind }
-  | { available: false; reason: 'unsupportedPlatform' | 'missingApiKey' };
+  | { available: false; reason: 'unsupportedPlatform' | 'missingApiKey' | 'configureFailed' };
 
 function resolveApiKey(): { apiKey: string; store: StoreKind } | null {
   const platformKey =
@@ -106,22 +106,37 @@ export function configurePurchases(): PurchasesAvailability {
     return availability;
   }
 
-  // Set before configure() so configuration itself is logged. Fire and forget:
-  // losing a log level is never worth failing setup over.
-  Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR).catch(() => {});
+  // Both calls are guarded together because both reach the native module, and
+  // both throw synchronously when it is missing: Expo Go, or a JS reload after
+  // the package was added without a native rebuild. `configure` also throws on
+  // a malformed key. Launch is the worst moment to let a store SDK raise, so the
+  // failure is cached as an unavailable verdict and the UI reports purchases as
+  // off instead of the app dying on the splash screen.
+  try {
+    // Set before configure() so configuration itself is logged. The promise is
+    // fire and forget: losing a log level is never worth failing setup over.
+    Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR).catch(() => {});
 
-  Purchases.configure({
-    apiKey: resolved.apiKey,
-    // No account system yet, so the SDK generates and persists an anonymous
-    // app user id. When sign-in lands, call `identifyPurchaser` after login
-    // instead of passing an id here, so existing anonymous purchases transfer.
-    appUserID: null,
-    // Signs entitlement responses and reports tampering through
-    // `entitlement.verification` without ever withholding access. Informational
-    // is the safe default: a verification outage degrades to granting the
-    // entitlement rather than locking out paying customers.
-    entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
-  });
+    Purchases.configure({
+      apiKey: resolved.apiKey,
+      // No account system yet, so the SDK generates and persists an anonymous
+      // app user id. When sign-in lands, call `identifyPurchaser` after login
+      // instead of passing an id here, so existing anonymous purchases transfer.
+      appUserID: null,
+      // Signs entitlement responses and reports tampering through
+      // `entitlement.verification` without ever withholding access. Informational
+      // is the safe default: a verification outage degrades to granting the
+      // entitlement rather than locking out paying customers.
+      entitlementVerificationMode: Purchases.ENTITLEMENT_VERIFICATION_MODE.INFORMATIONAL,
+    });
+  } catch (cause) {
+    console.warn(
+      '[purchases] RevenueCat failed to configure. Purchases stay disabled for this app session.',
+      cause,
+    );
+    availability = { available: false, reason: 'configureFailed' };
+    return availability;
+  }
 
   availability = { available: true, store: resolved.store };
   return availability;
