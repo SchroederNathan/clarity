@@ -117,6 +117,27 @@ function RootLayout() {
                       ),
                     }}
                   />
+                  {/* Same native-header treatment as the passage editor: our
+                      title and close button live in the stack toolbar, and the
+                      shared progressive blur lets rows scroll under it without a
+                      hard material edge. */}
+                  <Stack.Screen
+                    name="settings"
+                    options={{
+                      presentation: 'modal',
+                      title: '',
+                      headerTransparent: true,
+                      headerShadowVisible: false,
+                      headerBlurEffect: 'none',
+                      headerBackground: () => (
+                        <ProgressiveBlur
+                          direction="top"
+                          tint={scheme}
+                          style={{ flex: 1 }}
+                        />
+                      ),
+                    }}
+                  />
                   {/* Both draw their own close button and their own scrolling
                       (the paywall is ours, the Customer Center is a RevenueCat-
                       hosted native view), so they take the whole modal with no

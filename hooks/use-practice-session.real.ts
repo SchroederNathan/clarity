@@ -21,6 +21,7 @@ import {
   withBorrowedTimings,
 } from '@/services/live-recognition';
 import { claimEngine, releaseEngine } from '@/services/recognition-owner';
+import { getAccentLocale } from '@/services/settings';
 import {
   buildAzureResult,
   buildChunks,
@@ -610,7 +611,14 @@ export function usePracticeSession(passage: Passage): PracticeSession {
             wavBytes: sliceWav(segmentBytes[c.segmentIndex]!, c.startMs, c.endMs),
             referenceText: c.referenceText,
           }));
-          const assessments = await assessSession(wavChunks, { key, region });
+          // Read here, not from a hook: `stop()` is not a render. The accent
+          // decides which reference Azure grades against, and it is the
+          // difference between a British reading scoring 80 and scoring 100.
+          const assessments = await assessSession(wavChunks, {
+            key,
+            region,
+            locale: getAccentLocale(),
+          });
           const azure = buildAzureResult({
             ...base,
             chunks,

@@ -166,7 +166,13 @@ function parseSyllables(word: Record<string, unknown>): AzureSyllable[] | undefi
       durationMs: ticksToMs(s.Duration),
     };
   });
-  const usable = parsed.filter((s) => s.syllable.length > 0);
+  // A syllable counts as usable when it has EITHER a symbol or a grapheme.
+  // Filtering on the symbol alone silently dropped the whole syllable tier for
+  // every non-US accent: those locales return the syllable structure and its
+  // score with an EMPTY `Syllable` string but a real `Grapheme` ("deep"), which
+  // is exactly what the UI prints. Measured against the live endpoint, not
+  // assumed.
+  const usable = parsed.filter((s) => s.syllable.length > 0 || s.grapheme != null);
   return usable.length > 0 ? usable : undefined;
 }
 
