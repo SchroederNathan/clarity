@@ -117,9 +117,10 @@ function RootLayout() {
                       ),
                     }}
                   />
-                  {/* Both are RevenueCat-hosted native views that draw their own
-                      close button and their own scrolling, so they take the whole
-                      modal with no header of ours on top. */}
+                  {/* Both draw their own close button and their own scrolling
+                      (the paywall is ours, the Customer Center is a RevenueCat-
+                      hosted native view), so they take the whole modal with no
+                      header of ours on top. */}
                   <Stack.Screen
                     name="paywall"
                     options={{ presentation: 'modal', headerShown: false }}
