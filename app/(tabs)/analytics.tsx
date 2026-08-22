@@ -165,6 +165,7 @@ export default function AnalyticsScreen() {
   const scroll = {
     onScroll,
     scrollEventThrottle: 16,
+    showsVerticalScrollIndicator: false,
     style: { flex: 1 },
     contentContainerStyle: {
       paddingTop: insets.top + spacing.xxl,

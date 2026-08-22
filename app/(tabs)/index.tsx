@@ -113,6 +113,7 @@ export default function HomeScreen() {
     <Animated.ScrollView
       onScroll={onScroll}
       scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
       style={{ flex: 1 }}
       contentContainerStyle={{
         paddingTop: insets.top + spacing.xxl,

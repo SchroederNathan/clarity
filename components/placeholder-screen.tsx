@@ -17,6 +17,7 @@ export function PlaceholderScreen({ title }: { title: string }) {
     <Animated.ScrollView
       onScroll={onScroll}
       scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
       style={{ flex: 1 }}
       contentContainerStyle={{
         paddingTop: insets.top + spacing.xxl,
