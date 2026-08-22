@@ -1,12 +1,21 @@
 import { barY } from '@tanstack/charts/bar';
 import { Chart } from '@tanstack/charts/react-native';
-import { tooltip } from '@tanstack/charts/react-native/tooltip';
+import {
+  type NativeChartTooltipExtension,
+  type NativeChartTooltipProps,
+} from '@tanstack/charts/react-native/tooltip';
 import { ruleY } from '@tanstack/charts/rule';
 import { scaleBand } from '@tanstack/charts/scales/band';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { defineChart } from '@tanstack/charts/scene';
 import { text } from '@tanstack/charts/text';
-import { useMemo } from 'react';
+import {
+  createChartTooltipContent,
+  resolveChartTooltipAnchor,
+  resolveChartTooltipPlacement,
+} from '@tanstack/charts/tooltip/model';
+import type { ChartValue } from '@tanstack/charts/types';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui';
@@ -58,11 +67,82 @@ function barTop(point: ScoreChartPoint): number {
 }
 
 /**
+ * TanStack's RN tooltip host paints a hardcoded white shell (padding, border,
+ * shadow) around `renderTooltip`. We keep its placement math and swap the
+ * chrome for a transparent overlay so the themed card is the only surface.
+ */
+function ThemedChartTooltip<TDatum, TXValue extends ChartValue, TYValue extends ChartValue>({
+  scene,
+  width,
+  height,
+  points,
+  pointer,
+  focusSource,
+  options,
+  pinned,
+  dismiss,
+  render,
+}: NativeChartTooltipProps<TDatum, TXValue, TYValue>) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const point = points[0];
+  if (!point || !render) return null;
+
+  const content = createChartTooltipContent(points, scene, pinned, options, point);
+  const sceneAnchor = resolveChartTooltipAnchor(point, points, scene, pointer, options, {
+    primary: point,
+    group: points,
+    source: focusSource,
+    pinned,
+  });
+  const position = resolveChartTooltipPlacement(
+    {
+      x: (sceneAnchor.x / scene.width) * width,
+      y: (sceneAnchor.y / scene.height) * height,
+    },
+    size,
+    { left: 0, top: 0, right: width, bottom: height },
+    options?.placement,
+    options?.offset,
+  );
+  const accessibilityLabel =
+    typeof content === 'string'
+      ? content
+      : [content.title, ...content.rows.map((row) => `${row.label}: ${row.value}`)]
+          .filter(Boolean)
+          .join('\n');
+
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityLiveRegion={pinned ? 'none' : 'polite'}
+      accessibilityRole={pinned ? 'summary' : undefined}
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout;
+        if (next.width !== size.width || next.height !== size.height) {
+          setSize({ width: next.width, height: next.height });
+        }
+      }}
+      onStartShouldSetResponder={() => pinned}
+      pointerEvents={pinned ? 'auto' : 'none'}
+      style={[styles.host, { left: position.left, top: position.top }]}>
+      {render({ points, content, pinned, dismiss, defaultBody: null })}
+    </View>
+  );
+}
+
+const themedTooltip: NativeChartTooltipExtension = {
+  id: 'themed-react-native-tooltip',
+  __chartExtensionType: 'tooltip',
+  __chartTooltipHost: 'react-native',
+  create: () => ThemedChartTooltip,
+};
+
+/**
  * The speaking-score bar chart, drawn with TanStack Charts' native SVG host.
  *
  * Three bar marks share one explicit band domain: full-coverage days, partial
  * days (faded, same rule as before: scored on fewer skills), and no-practice
- * stubs. `focus: 'nearest-x'` + the native tooltip give every bucket a tap
+ * stubs. `focus: 'nearest-x'` plus a themed tooltip give every bucket a tap
  * detail — date, exact score and band, sessions, and minutes — which the old
  * hand-rolled chart could not do beyond seven weekday initials.
  */
@@ -133,7 +213,7 @@ export function ScoreChart({ points, avg }: ScoreChartProps) {
         axis: false,
       },
       focus: 'nearest-x',
-      tooltip: { use: tooltip, sticky: true },
+      tooltip: { use: themedTooltip, sticky: true },
       theme: {
         foreground: colors.foreground,
         muted: colors.tertiary,
@@ -193,6 +273,11 @@ export function ScoreChart({ points, avg }: ScoreChartProps) {
 }
 
 const styles = StyleSheet.create({
+  host: {
+    position: 'absolute',
+    zIndex: 1,
+    maxWidth: '80%',
+  },
   tooltip: {
     padding: spacing.md,
     gap: spacing.xs,
