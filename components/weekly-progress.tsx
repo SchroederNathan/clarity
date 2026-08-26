@@ -94,7 +94,7 @@ export function WeeklyProgress({ todayProgress, history = DEFAULT_HISTORY }: Wee
               // Rotated so today's arc grows from 12 o'clock; the full rings
               // are rotation-invariant apart from the dash seam.
               <Svg width={RING_SIZE} height={RING_SIZE} style={styles.ringSvg}>
-                {day.isToday ? (
+                {day.isToday && todayProgress > 0 ? (
                   <TodayRing progress={todayProgress} color={colors.foreground} />
                 ) : (
                   <Circle
